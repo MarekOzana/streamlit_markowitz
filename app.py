@@ -22,7 +22,6 @@ st.set_page_config(page_title="Markowitz", layout="wide", page_icon="data/app_ic
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-
 class ChartManager:
     @staticmethod
     def create_scatter_chart(g_data: pl.DataFrame) -> alt.Chart:
@@ -164,7 +163,7 @@ class ChartManager:
         r_cum = r_cum.with_columns(
             (pl.col("date") == pl.col("date").max()).alias("is_last")
         )
-        order = {"Hybrid": 0, "OPTIMAL": 1}
+        order = {"SEB Hybrid": 0, "OPTIMAL": 1}
         ord_tickers = sorted(
             r_cum["name"].unique().to_list(), key=lambda x: order.get(x, float("inf"))
         )
@@ -176,12 +175,12 @@ class ChartManager:
         )
         line = base.mark_line().encode(
             opacity=alt.condition(
-                alt.FieldOneOfPredicate(field="name", oneOf=["Hybrid", "OPTIMAL"]),
+                alt.FieldOneOfPredicate(field="name", oneOf=["SEB Hybrid", "OPTIMAL"]),
                 alt.value(1),
                 alt.value(0.6),
             ),
             size=alt.condition(
-                alt.FieldOneOfPredicate(field="name", oneOf=["Hybrid", "OPTIMAL"]),
+                alt.FieldOneOfPredicate(field="name", oneOf=["SEB Hybrid", "OPTIMAL"]),
                 alt.value(3),
                 alt.value(1.25),
             ),
