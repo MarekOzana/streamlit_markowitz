@@ -13,9 +13,6 @@ from numpy.testing import assert_array_almost_equal
 import numpy as np
 import polars.selectors as cs
 import polars as pl
-from unittest.mock import patch, Mock
-import yfinance as yf
-import logging
 
 
 # Fixture to create a DataManager instance

@@ -1,0 +1,16 @@
+**Disclaimer:**  
+The Optimal Portfolio Generator is for informational purposes only and is not intended as financial advice, nor does it constitute an offer, invitation, or recommendation to buy or sell securities. We do not guarantee the accuracy or completeness of the information provided.
+
+Investors are encouraged to seek independent legal, financial, and tax advice before making investment decisions. The material has not been reviewed by regulatory authorities and is not intended for distribution in jurisdictions where its distribution is prohibited.
+
+Investing involves risks, including the potential loss of principal. Past performance is not indicative of future results. The value of investments can fluctuate, and investors may not get back the amount invested. Derivatives involve high risks and are not suitable for all investors.
+
+This material does not account for individual circumstances and should not be considered tailored investment advice. Investors should consult their advisors and review the fund's objectives, risks, charges, and expenses before investing. Read the prospectus and Key Information Documents available for more details.
+
+We assume no liability for any loss or damage arising from the use of this app. Portfolio composition may change, and past information may not reflect current portfolio characteristics. Currency exchange rates can affect returns, and no hedging strategy guarantees performance.
+
+This information is current as of the date indicated and is subject to change without notice. Recipients are responsible for their investment decisions, and this material should not be viewed as investment advice or a recommendation.
+
+For investment advice tailored to your circumstances, please contact your investment advisor. You are solely responsible for your investment decisions.
+
+Data provided by Yahoo Finance is used under their terms and conditions. We are not affiliated with Yahoo Finance and do not endorse or guarantee the accuracy or completeness of the data provided by them. Users should verify the data before relying on it for investment decisions. The use of Yahoo Finance data is at your own risk, and we are not responsible for any errors or omissions in the data provided.

@@ -1,0 +1,10 @@
+Welcome to the Optimal Portfolio Generator! This app aids in creating an optimal portfolio based on your required minimum return.
+
+**How to Use the App:**
+1. **Set Your Required Return:** Adjust the slider in the sidebar to set your desired minimum return. 
+2. **Select Tickers:** Pick stocks or assets from the multiselect dropdown. Your portfolio will be built based on these choices.
+3. **Analyze the Portfolio:** With your return set and tickers chosen, the app displays the optimal portfolio. It includes a risk vs. return scatter chart, asset weight bar chart, and other charts showing historical and expected returns.
+4. **Iterate:** Modify the return or tickers to explore how the portfolio adjusts. This helps you make informed decisions by understanding the trade-offs.
+5. **Adjust Assumptions:** On the *DATA* tab, tweak expected returns, volatilities, and correlations. Initial values are based on daily returns since the start of 2023.
+
+Use this tool to explore how varying parameters influence your portfolio's risk and return profile. Happy investing!
