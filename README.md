@@ -4,3 +4,8 @@ This Streamlit app calculates an optimal investment portfolio based on a user-de
 The app provides visual insights through charts that showcase the risk-return profile, asset weights, historical performance, and projected expected returns and probabilities of negative returns for several horizons.  
 
 Users can change underlying assumptions about expected returns, volatilities, and correlations between different funds in the "Data" tab.
+
+## How to run
+```bash
+>>> streamlit run app.py
+```
