@@ -46,7 +46,7 @@ class DataManager:
         price_tbl: Path = Path("data/t_price.parquet")
     ):
         self.fund_tbl:Path = Path(fund_tbl)
-        self.price_tbl:Path = Path(fund_tbl)
+        self.price_tbl:Path = Path(price_tbl)
         self.t_fund = pl.read_csv(fund_tbl).with_columns(self.FUND_COLS)
         self.t_price = pl.read_parquet(price_tbl).with_columns(self.PRICE_COLS)
         self.set_ret_vol_corr(self.names())  # initialize
