@@ -60,3 +60,13 @@ def test_create_exp_ret_chart():
     r_fig, p_fig = src.charts.create_exp_ret_chart(r_ann=0.05, vol_ann=0.08, n=12)
     assert isinstance(r_fig, alt.Chart)
     assert isinstance(p_fig, alt.Chart)
+
+def test_create_cum_ret_chart():
+    r_cum = pl.read_parquet("tests/data/r_cum.parquet")
+    fig = src.charts.create_cum_ret_chart(r_cum)
+    assert isinstance(fig, alt.LayerChart)
+    f_line, f_text = fig.layer
+    assert isinstance(f_line, alt.Chart)
+    assert f_line.title == "Cumulative Returns"
+    assert f_line.mark == "line"
+    assert isinstance(f_text, alt.Chart)

@@ -51,47 +51,87 @@ class DataManager:
         self.t_price = pl.read_parquet(price_tbl).with_columns(self.PRICE_COLS)
         self.set_ret_vol_corr(self.names())  # initialize
 
-    def update_from_yahoo(self) -> None:
-        """Update time series for all tickers from yahoo finance"""
+    def _setup_session(self) -> requests.Session:
+        """
+        Initialize and configure an HTTP session for fetching data from Yahoo Finance.
+
+        This method sets up a requests session, applying a proxy configuration if the
+        YFIN_PROXY environment variable is set. If the proxy is set, it configures the
+        session to use this proxy for HTTP and HTTPS requests. Additionally, it
+        configures the session to use the appropriate SSL certification based
+        on the certifi library's default location.
+
+        Returns:
+            requests.Session: A configured requests.Session object ready for use in data
+            fetching, with or without proxy settings applied.
+        """
         session = requests.Session()
-        if (yfin_proxy := os.getenv("YFIN_PROXY")) is not None:
+        yfin_proxy = os.getenv("YFIN_PROXY")
+        if yfin_proxy:
             logger.debug(f"Using proxy: {yfin_proxy}")
-            proxies = {
-                "http": yfin_proxy,
-                "https": yfin_proxy,
-            }
-            session.proxies.update(proxies)
-            session.verify = certifi.where()  # append SEB's .pem to cacert.pem
+            session.proxies.update({"http": yfin_proxy, "https": yfin_proxy})
+            session.verify = certifi.where()
         else:
             logger.debug("Not using proxy")
+        return session
+
+    def _download_data(self, session: requests.Session, f_row: dict) -> pl.DataFrame:
+        """
+        Download historical stock data from Yahoo Finance for a specific fund.
+
+        This method takes a session and a fund row, downloads historical stock data
+        from the specified start date using Yahoo Finance, and returns a DataFrame
+        with the new prices.
+
+        Parameters:
+            session (requests.Session): The HTTP session to be used for making API calls.
+            f_row (dict): A dictionary representing a row from the funds table. It must
+                        include the following keys:
+                        - 'name': The name of the fund.
+                        - 'yahoo': The ticker symbol of the fund as used in Yahoo Finance.
+                        - 'start_date': The date from which to start fetching the historical data.
+                        - 'id': The unique identifier of the fund.
+
+        Returns:
+            pl.DataFrame: A Polars DataFrame containing the downloaded price data.
+                            The DataFrame includes the following columns: 'fund_id', 'date',
+                            and 'price'. If no data is downloaded, None is returned.
+
+        Note:
+            If the historical data for the specified fund is empty, a log message is generated,
+            and None is returned.
+        """
+        logger.info(f"Updating {f_row['name']} from {f_row['start_date']}")
+        yf_ticker = yf.Ticker(ticker=f_row["yahoo"], session=session)
+        ts = yf_ticker.history(start=f_row["start_date"], interval="1d")
+        if len(ts) == 0:
+            logger.debug(f"No data for {f_row['name']}")
+            return None
+        new_prices = pl.DataFrame(
+            {"fund_id": f_row["id"], "date": list(ts.index.date), "price": ts["Close"]}
+        ).with_columns(self.PRICE_COLS)
+        return new_prices
+
+    def update_from_yahoo(self) -> None:
+        """Update time series for all tickers from yahoo finance"""
+        session = self._setup_session()
 
         tbl = self.last_update().with_columns(
             (
                 pl.col("max_date").fill_null(date(2022, 12, 31)) + pl.duration(days=1)
             ).alias("start_date")
         )
+        is_updated: bool = False
         for f_row in tbl.rows(named=True):
-            logger.info(f"Updating {f_row['name']} from {f_row['start_date']}")
-
-            # Download data
-            ts = yf.Ticker(ticker=f_row["yahoo"], session=session).history(
-                start=f_row["start_date"], interval="1d"
-            )
-            if len(ts) == 0:
-                continue
-            # Append to existing table
-            new_prices = pl.DataFrame(
-                {
-                    "fund_id": f_row["id"],
-                    "date": list(ts.index.date),
-                    "price": ts["Close"],
-                }
-            ).with_columns(self.PRICE_COLS)
-            self.t_price = pl.concat([self.t_price, new_prices])
+            new_prices = self._download_data(session, f_row)
+            if new_prices is not None:
+                self.t_price = pl.concat([self.t_price, new_prices])
+                is_updated = True
 
         # Save the data
-        logger.info(f"Saving data to {self.price_tbl}")
-        self.t_price.write_parquet(self.price_tbl)
+        if is_updated:
+            logger.info(f"Saving data to {self.price_tbl}")
+            self.t_price.write_parquet(self.price_tbl)
 
     def set_ret_vol_corr(self, names: list) -> tuple:
         """Calculate and set vol, corr and exp_returns given list of 'names'
