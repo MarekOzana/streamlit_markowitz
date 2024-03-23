@@ -61,6 +61,7 @@ def test_create_exp_ret_chart():
     assert isinstance(r_fig, alt.Chart)
     assert isinstance(p_fig, alt.Chart)
 
+
 def test_create_cum_ret_chart():
     r_cum = pl.read_parquet("tests/data/r_cum.parquet")
     fig = src.charts.create_cum_ret_chart(r_cum)

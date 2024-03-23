@@ -84,22 +84,22 @@ class DataManager:
         with the new prices.
 
         Parameters:
-            session (requests.Session): The HTTP session to be used for making API calls.
-            f_row (dict): A dictionary representing a row from the funds table. It must
-                        include the following keys:
+            session (requests.Session): The HTTP session to be used forAPI calls.
+            f_row (dict): A dictionary representing a row from the funds table. It
+                        includes the following keys:
                         - 'name': The name of the fund.
-                        - 'yahoo': The ticker symbol of the fund as used in Yahoo Finance.
-                        - 'start_date': The date from which to start fetching the historical data.
+                        - 'yahoo': The ticker symbol (Yahoo Finance).
+                        - 'start_date': The date from which to start fetching the data.
                         - 'id': The unique identifier of the fund.
 
         Returns:
             pl.DataFrame: A Polars DataFrame containing the downloaded price data.
-                            The DataFrame includes the following columns: 'fund_id', 'date',
-                            and 'price'. If no data is downloaded, None is returned.
+                            The DataFrame includes the following columns:
+                            'fund_id', 'date', and 'price'.
+                            If no data is downloaded, None is returned.
 
         Note:
-            If the historical data for the specified fund is empty, a log message is generated,
-            and None is returned.
+            If the historical data for the specified fund is empty
         """
         logger.info(f"Updating {f_row['name']} from {f_row['start_date']}")
         yf_ticker = yf.Ticker(ticker=f_row["yahoo"], session=session)

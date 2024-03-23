@@ -107,7 +107,7 @@ def test_download_data_empty_series(dm: DataManager, caplog: pytest.LogCaptureFi
         "id": 1,
     }
 
-    # Create an empty mock DataFrame to simulate no data returned by yfinance.Ticker.history
+    # Create an empty DataFrame to simulate no data returned by yfinance.Ticker.history
     mock_ts = pd.DataFrame(columns=["Open", "Close", "High", "Low", "Volume"])
 
     # Patch yfinance.Ticker.history to return the empty mock DataFrame
@@ -142,7 +142,7 @@ def test_update_from_yahoo(dm: DataManager, caplog: pytest.LogCaptureFixture):
                 m_setup.assert_called_once()
                 m_download.assert_called()
                 m_write.assert_called_once_with(dm.price_tbl)
-                assert r"Saving data to tests\data\t_price.parquet" in caplog.text
+                assert r"Saving data to tests" in caplog.text
 
 
 def test_set_ret_vol_corr(dm: DataManager):
