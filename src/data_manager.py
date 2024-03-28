@@ -26,6 +26,7 @@ import yfinance as yf
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+
 class DataManager:
     FUND_COLS: list = [
         pl.col("id").cast(pl.Int16),
@@ -48,7 +49,7 @@ class DataManager:
     ):
         self.fund_tbl: Path = Path(fund_tbl)
         self.price_tbl: Path = Path(price_tbl)
-        self.lock:FileLock = FileLock(self.price_tbl.with_suffix(".lock"))
+        self.lock: FileLock = FileLock(self.price_tbl.with_suffix(".lock"))
 
         self.t_fund = pl.read_csv(fund_tbl).with_columns(self.FUND_COLS)
         with self.lock:
@@ -362,12 +363,15 @@ class Updater:
         ]
     )
 
-    def import_fund_info(self, f_name: Path) -> pl.DataFrame:
+    def __init__(self, f_name: Path) -> None:
+        self.tbl: pl.LazyFrame = self._import_fund_info(f_name)
+
+    def _import_fund_info(self, f_name: Path) -> pl.LazyFrame:
         """
         Import Fund exposures and key figures from csv file
         """
         tbl = (
-            pl.read_csv(
+            pl.scan_csv(
                 f_name,
                 has_header=True,
                 skip_rows=7,
@@ -381,7 +385,9 @@ class Updater:
             .filter(pl.col("mv_pct").is_not_null())
             .with_columns(
                 pl.col("id").str.strip_chars_start(),
-                pl.col("ix_rtg").str.extract(r"^([ABCDabcd\d]+\+?-?)").str.to_uppercase(),
+                pl.col("ix_rtg")
+                .str.extract(r"^([ABCDabcd\d]+\+?-?)")
+                .str.to_uppercase(),
                 pl.col("rtg_moody")
                 .str.extract(r"^([ABCDabcd\d]+\+?-?)")
                 .str.to_uppercase(),
@@ -423,4 +429,19 @@ class Updater:
             )
         )
         return tbl
-        
+
+    def get_exp_table(self) -> pl.DataFrame:
+        df_exp = (
+            self.tbl.group_by(["portf", "m_rating", "rating", "ticker"])
+            .agg(pl.col("mv_pct").sum().mul(0.01))
+            .filter(pl.col("ticker").is_not_null())
+            .sort(
+                "portf",
+                "m_rating",
+                "rating",
+                "mv_pct",
+                descending=[True, False, False, True],
+                nulls_last=True,
+            )
+        )
+        return df_exp.collect()

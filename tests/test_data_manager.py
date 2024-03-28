@@ -256,7 +256,10 @@ def test_get_cumulative_rets_with_OPT(dm: DataManager):
 class TestUpdater:
     def test_import_fund_info(self):
         f_name = Path("tests/data/M_Funds.csv")
-        tbl = Updater().import_fund_info(f_name)
+        u = Updater(f_name)
+        
+        assert isinstance(u.tbl, pl.LazyFrame)
+        tbl = u.tbl.collect()
         assert tbl.shape == (10, 23)
         assert tbl["rating"].to_list() == [
             "BBB-",
@@ -270,3 +273,9 @@ class TestUpdater:
             "B+",
             "AA+",
         ]
+    
+    def test_get_exp_table(self):
+        f_name = Path("tests/data/M_Funds.csv")
+        u = Updater(f_name)
+        df_exp = u.get_exp_table()
+        assert df_exp.shape == (8, 5)
