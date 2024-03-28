@@ -18,6 +18,7 @@ import pytest
 from numpy.testing import assert_array_almost_equal
 
 from src.data_manager import DataManager
+from src.data_manager import Updater
 
 
 # Fixture to create a DataManager instance
@@ -33,7 +34,15 @@ def dm():
 def test__init__(dm: DataManager):
     assert dm.fund_tbl == Path("tests/data/t_fund.csv")
     assert dm.price_tbl == Path("tests/data/t_price.parquet")
-    assert dm.t_fund.shape == (7, 5)
+    assert dm.t_fund.shape == (7, 6)
+    assert dm.t_fund.columns == [
+        "id",
+        "name",
+        "long_name",
+        "yahoo",
+        "ticker",
+        "exp_ret",
+    ]
     assert dm.t_price.shape == (1881, 3)
     assert dm.corr.shape == (7, 8)
     assert dm.corr["name"].to_list() == [
@@ -242,3 +251,22 @@ def test_get_cumulative_rets_with_OPT(dm: DataManager):
         "name": ["OPTIMAL", "OPTIMAL"],
         "return": [0.1024, 0.1021],
     }
+
+
+class TestUpdater:
+    def test_import_fund_info(self):
+        f_name = Path("tests/data/M_Funds.csv")
+        tbl = Updater().import_fund_info(f_name)
+        assert tbl.shape == (10, 23)
+        assert tbl["rating"].to_list() == [
+            "BBB-",
+            "BBB",
+            "BBB-",
+            "BBB-",
+            "AA+",
+            "BB+",
+            "BB+",
+            "BB+",
+            "B+",
+            "AA+",
+        ]

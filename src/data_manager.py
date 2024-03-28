@@ -26,13 +26,13 @@ import yfinance as yf
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-
 class DataManager:
     FUND_COLS: list = [
         pl.col("id").cast(pl.Int16),
         pl.col("name").cast(pl.Utf8),
         pl.col("long_name").cast(pl.Utf8),
         pl.col("yahoo").cast(pl.Utf8),
+        pl.col("ticker").cast(pl.Utf8),
         pl.col("exp_ret").cast(pl.Float64),
     ]
     PRICE_COLS: list = [
@@ -40,7 +40,6 @@ class DataManager:
         pl.col("date").cast(pl.Date),
         pl.col("price").cast(pl.Float64),
     ]
-    lock = FileLock("data/t_price.lock")
 
     def __init__(
         self,
@@ -49,6 +48,8 @@ class DataManager:
     ):
         self.fund_tbl: Path = Path(fund_tbl)
         self.price_tbl: Path = Path(price_tbl)
+        self.lock:FileLock = FileLock(self.price_tbl.with_suffix(".lock"))
+
         self.t_fund = pl.read_csv(fund_tbl).with_columns(self.FUND_COLS)
         with self.lock:
             self.t_price = pl.read_parquet(price_tbl).with_columns(self.PRICE_COLS)
@@ -241,3 +242,185 @@ class DataManager:
             )
         )
         return r_cum
+
+
+class Updater:
+    PREP2COLS: dict[str, str] = {
+        "Ticker": "ticker",
+        "Cpn": "cpn",
+        "Crncy": "crncy",
+        "Next Call Date": "next_call",
+        "Cntry": "country",
+        "Yield to Call": "ytc",
+        "Yield to Worst": "ytw",
+        "Z-Spd": "zspread",
+        "OAS": "oas",
+        "S-OAS": "s_oas",
+        "OAD": "oad",
+        "OASD": "oasd",
+        "DTS": "dts",
+        "Index Rtg": "ix_rtg",
+        "S&P": "rtg_sp",
+        "Moody's": "rtg_moody",
+        "Fitch": "rtg_fitch",
+        "BB Comp": "rtg_bb",
+        "Market Value (%)": "mv_pct",
+        "Book Port": "portf",
+    }
+
+    MOODY_TO_SP: dict[str, str] = {
+        "AAA": "AAA",
+        "AA1": "AA+",
+        "AA2": "AA",
+        "AA3": "AA-",
+        "A1": "A+",
+        "A2": "A",
+        "A3": "A-",
+        "BAA1": "BBB+",
+        "BAA2": "BBB",
+        "BAA3": "BBB-",
+        "BA1": "BB+",
+        "BA2": "BB",
+        "BA3": "BB-",
+        "B1": "B+",
+        "B2": "B",
+        "B3": "B-",
+        "CAA1": "CCC+",
+        "CAA2": "CCC",
+        "CAA3": "CCC-",
+        "CA": "CC",
+        "C": "C",
+        "D": "D",
+    }
+
+    RATING_TO_MRATING: dict[str, str] = {
+        "AAA": "AAA",
+        "AA+": "AA",
+        "AA": "AA",
+        "AA-": "AA",
+        "A+": "A",
+        "A": "A",
+        "A-": "A",
+        "BBB+": "BBB",
+        "BBB": "BBB",
+        "BBB-": "BBB",
+        "BB+": "BB",
+        "BB": "BB",
+        "BB-": "BB",
+        "B+": "B",
+        "B": "B",
+        "B-": "B",
+        "CCC+": "CCC",
+        "CCC": "CCC",
+        "CCC-": "CCC",
+        "CC": "CC",
+        "C": "C",
+        "D": "D",
+    }
+
+    RATING_TYPE: pl.Enum = pl.Enum(
+        [
+            "AAA",
+            "AA+",
+            "AA",
+            "AA-",
+            "A+",
+            "A",
+            "A-",
+            "BBB+",
+            "BBB",
+            "BBB-",
+            "BB+",
+            "BB",
+            "BB-",
+            "B+",
+            "B",
+            "B-",
+            "CCC+",
+            "CCC",
+            "CCC-",
+            "CC",
+            "C",
+            "D",
+        ]
+    )
+
+    MRATING_TYPE: pl.Enum = pl.Enum(
+        [
+            "AAA",
+            "AA",
+            "A",
+            "BBB",
+            "BB",
+            "B",
+            "CCC",
+            "CC",
+            "C",
+            "D",
+            "NR",
+            "Cash",
+        ]
+    )
+
+    def import_fund_info(self, f_name: Path) -> pl.DataFrame:
+        """
+        Import Fund exposures and key figures from csv file
+        """
+        tbl = (
+            pl.read_csv(
+                f_name,
+                has_header=True,
+                skip_rows=7,
+                dtypes={"Next Call Date": pl.Date},
+                null_values=[""],
+                new_columns=[
+                    "id",
+                ],
+            )
+            .rename(self.PREP2COLS)
+            .filter(pl.col("mv_pct").is_not_null())
+            .with_columns(
+                pl.col("id").str.strip_chars_start(),
+                pl.col("ix_rtg").str.extract(r"^([ABCDabcd\d]+\+?-?)").str.to_uppercase(),
+                pl.col("rtg_moody")
+                .str.extract(r"^([ABCDabcd\d]+\+?-?)")
+                .str.to_uppercase(),
+                pl.col("rtg_sp").str.extract(r"^([ABCDabcd\d]+\+?-?)"),
+                pl.col("rtg_fitch").str.extract(r"^([ABCDabcd\d]+\+?-?)"),
+            )
+            .with_columns(
+                # rating = ix -> moodys -> sp -> fitch
+                pl.col("ix_rtg")
+                .fill_null(pl.col("rtg_moody"))
+                .map_elements(lambda x: self.MOODY_TO_SP.get(x))
+                .fill_null(pl.col("rtg_sp"))
+                .fill_null(pl.col("rtg_fitch"))
+                .cast(self.RATING_TYPE)
+                .alias("rating"),
+            )
+            .with_columns(
+                pl.col("rating")
+                .map_elements(lambda x: self.RATING_TO_MRATING.get(x))
+                .cast(self.MRATING_TYPE)
+                .alias("m_rating")
+            )
+            .with_columns(
+                # Set ticker='Cash' for cash
+                pl.when(pl.col("id").str.contains("Not Classified"))
+                .then(pl.lit("Cash"))
+                .otherwise(pl.col("ticker"))
+                .alias("ticker"),
+                # Set rating='AA?' for cash
+                pl.when(pl.col("id").str.contains("Not Classified"))
+                .then(pl.lit("AA+"))
+                .otherwise(pl.col("rating"))
+                .alias("rating"),
+                # Set m_rating='Cash' for cash
+                pl.when(pl.col("id").str.contains("Not Classified"))
+                .then(pl.lit("Cash"))
+                .otherwise(pl.col("m_rating"))
+                .alias("m_rating"),
+            )
+        )
+        return tbl
+        
