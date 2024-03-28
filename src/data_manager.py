@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 from datetime import date
 
+from filelock import FileLock
 import certifi
 import numpy as np
 import polars as pl
@@ -39,6 +40,7 @@ class DataManager:
         pl.col("date").cast(pl.Date),
         pl.col("price").cast(pl.Float64),
     ]
+    lock = FileLock("data/t_price.lock")
 
     def __init__(
         self,
@@ -48,7 +50,8 @@ class DataManager:
         self.fund_tbl: Path = Path(fund_tbl)
         self.price_tbl: Path = Path(price_tbl)
         self.t_fund = pl.read_csv(fund_tbl).with_columns(self.FUND_COLS)
-        self.t_price = pl.read_parquet(price_tbl).with_columns(self.PRICE_COLS)
+        with self.lock:
+            self.t_price = pl.read_parquet(price_tbl).with_columns(self.PRICE_COLS)
         self.set_ret_vol_corr(self.names())  # initialize
 
     def _setup_session(self) -> requests.Session:
@@ -131,7 +134,8 @@ class DataManager:
         # Save the data
         if is_updated:
             logger.info(f"Saving data to {self.price_tbl}")
-            self.t_price.write_parquet(self.price_tbl)
+            with self.lock:
+                self.t_price.write_parquet(self.price_tbl)
 
     def set_ret_vol_corr(self, names: list) -> tuple:
         """Calculate and set vol, corr and exp_returns given list of 'names'
