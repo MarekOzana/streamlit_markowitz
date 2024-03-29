@@ -128,6 +128,7 @@ def create_edit_assumptions_tab(db: DataManager) -> None:
     if st.button("Update Data from Yahoo"):
         with st.spinner("Updating from Yahoo"):
             db.update_from_yahoo()
+            st.rerun()  # Make sure the values are updated
 
 
 @st.cache_resource

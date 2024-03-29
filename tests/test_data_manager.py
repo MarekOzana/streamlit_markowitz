@@ -259,10 +259,12 @@ class TestUpdater:
         f_name = Path("tests/data/M_Funds.csv")
         return Updater(f_name)
 
-    def test_save_t_exp_table(self, updater: Updater, tmp_path: Path):
+    def test_save_t_exp_table(self, updater: Updater, tmp_path: Path, caplog):
         o_path: Path = tmp_path / "test_t_exp.parquet"
-        updater.save_t_exp_table(o_name=o_path)
-
+        with caplog.at_level(level="DEBUG"):
+            updater.save_t_exp_table(o_name=o_path)
+        
+        assert "Saving exposures to" in caplog.text
         # Verify the file exists
         assert o_path.exists()
 

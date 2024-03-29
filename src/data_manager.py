@@ -440,7 +440,7 @@ class Updater:
 
     def save_t_exp_table(self, o_name: Path = Path("data/t_exp.parquet")) -> None:
         """Create and save exposure table to o_name"""
-        df_exp: pl.LazyFrame = (
+        df_exp: pl.DataFrame = (
             self.tbl.group_by(["portf", "m_rating", "rating", "ticker"])
             .agg(pl.col("mv_pct").sum().mul(0.01))
             .filter(pl.col("ticker").is_not_null())
@@ -452,6 +452,7 @@ class Updater:
                 descending=[True, False, False, True],
                 nulls_last=True,
             )
+            .collect()
         )
         logger.info(f"Saving exposures to {o_name}")
-        df_exp.collect().write_parquet(o_name)
+        df_exp.write_parquet(o_name)
