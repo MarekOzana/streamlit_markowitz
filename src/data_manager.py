@@ -46,7 +46,7 @@ class DataManager:
         self,
         fund_tbl: Path = Path("data/t_fund.csv"),
         price_tbl: Path = Path("data/t_price.parquet"),
-        exp_tbl: Path=Path("data/t_exp.parquet")
+        exp_tbl: Path = Path("data/t_exp.parquet"),
     ):
         self.price_tbl: Path = Path(price_tbl)
         self.lock: FileLock = FileLock(self.price_tbl.with_suffix(".lock"))
@@ -218,9 +218,19 @@ class DataManager:
         daily_rets = nav_data.with_columns(cs.by_dtype(pl.Float64).pct_change())
         return daily_rets
 
+    def get_cumulative_rets(self, name: str) -> pl.DataFrame:
+        """Return time series with cumulative returns for single security"""
+        r_cum:pl.DataFrame = (
+            self.get_daily_rets(names=[name])
+            .fill_null(0)
+            .with_columns(cs.by_dtype(pl.Float64).add(1).cum_prod().sub(1))
+        )
+        return r_cum
+
     def get_cumulative_rets_with_OPT(self, names: list, w: np.array) -> pl.DataFrame:
         """Return long dataframe with cumulative returns for each ticker
         and for optimal porfolio defined by weights array 'w'
+        NOTE: the start date is fixed ot 30th of March
         """
         # Cumulative returns chart
         start_dt: date = date(2023, 3, 30)
@@ -377,6 +387,7 @@ class Updater:
         >>> u.save_t_exp_table(o_name='data/t_exp.parquet')
         """
         self.tbl: pl.LazyFrame = self._import_fund_info(f_name)
+        # TODO: insert key figures and date
 
     def _import_fund_info(self, f_name: Path) -> pl.LazyFrame:
         """

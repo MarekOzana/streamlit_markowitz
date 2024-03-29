@@ -54,6 +54,11 @@ def get_params(db: DataManager) -> float:
     if ("tickers" not in st.session_state) or (tickers != st.session_state["tickers"]):
         st.session_state["tickers"] = tickers
         db.set_ret_vol_corr(tickers)
+
+    st.divider()
+    with st.popover("How to Use the App"):
+        st.markdown(pathlib.Path("data/usage.txt").read_text())
+
     return r_min
 
 
@@ -144,16 +149,17 @@ def main() -> None:
     with st.sidebar:
         st.title("Parameters")
         r_min = get_params(db)
-        st.divider()
-        with st.popover("How to Use the App"):
-            st.markdown(pathlib.Path("data/usage.txt").read_text())
 
-    tab_main, tab_data = st.tabs(["Optimal Portfolio", "Data"])
+    tab_main, tab_data, tab_fund = st.tabs(["Optimal Portfolio", "Data", "Fund Info"])
     with tab_main:
         create_main_tab(db, r_min)
 
     with tab_data:
         create_edit_assumptions_tab(db)
+
+    with tab_fund:
+        r_cum = db.get_cumulative_rets(name='SEB Hybrid')
+        st.line_chart(r_cum, x="date", y=["SEB Hybrid"])
 
     st.divider()
     st.caption(pathlib.Path("data/disclaimer.txt").read_text())

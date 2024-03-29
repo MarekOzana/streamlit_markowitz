@@ -143,14 +143,17 @@ def test_update_from_yahoo(dm: DataManager, caplog: pytest.LogCaptureFixture):
                         "price": [115.0],
                     }
                 ).with_columns(DataManager.PRICE_COLS)
-
+                 # Use a MagicMock for the callback to check calls
+                m_callback = MagicMock()
                 with caplog.at_level(level="DEBUG"):
-                    dm.update_from_yahoo()
+                    dm.update_from_yahoo(callback=m_callback)
                 # Assertions will depend on what you want to check, for example:
                 m_setup.assert_called_once()
                 m_download.assert_called()
                 m_write.assert_called_once_with(dm.price_tbl)
                 assert r"Saving data to tests" in caplog.text
+                assert m_callback.call_count == 7
+                m_callback.assert_any_call(1.0/7.0)
 
 
 def test_set_ret_vol_corr(dm: DataManager):
@@ -237,6 +240,14 @@ def test_last_update(dm: DataManager):
     }
 
 
+def test_get_cumulative_rets(dm: DataManager):
+    r_cum = dm.get_cumulative_rets(name="SEB Hybrid")
+    assert isinstance(r_cum, pl.DataFrame)
+    assert r_cum.columns == ["date", "SEB Hybrid"]
+    assert r_cum.shape == (234, 2)
+    assert round(r_cum.item(-1, "SEB Hybrid"), 3) == 0.125
+
+
 def test_get_cumulative_rets_with_OPT(dm: DataManager):
     c_rets = dm.get_cumulative_rets_with_OPT(
         names=["SEB Hybrid", "Corps"], w=np.array([0.6, 0.4])
@@ -258,7 +269,9 @@ class TestUpdater:
         f_name = Path("tests/data/M_Funds.csv")
         return Updater(f_name)
 
-    def test_save_t_exp_table(self, updater: Updater, tmp_path: Path, caplog):
+    def test_save_t_exp_table(
+        self, updater: Updater, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ):
         o_path: Path = tmp_path / "test_t_exp.parquet"
         with caplog.at_level(level="DEBUG"):
             updater.save_t_exp_table(o_name=o_path)
