@@ -126,9 +126,9 @@ def create_edit_assumptions_tab(db: DataManager) -> None:
     st.divider()
     st.info(f"Last Price Update: {db.last_update()['max_date'].max():%F}")
     if st.button("Update Data from Yahoo"):
-        with st.spinner("Updating from Yahoo"):
-            db.update_from_yahoo()
-            st.rerun()  # Make sure the values are updated
+        my_bar = st.progress(0, text="Updating from Yahoo")
+        db.update_from_yahoo(callback=lambda x: my_bar.progress(x))
+        st.rerun()  # Make sure the values are updated
 
 
 @st.cache_resource

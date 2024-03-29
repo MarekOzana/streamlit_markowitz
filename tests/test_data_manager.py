@@ -263,7 +263,7 @@ class TestUpdater:
         o_path: Path = tmp_path / "test_t_exp.parquet"
         with caplog.at_level(level="DEBUG"):
             updater.save_t_exp_table(o_name=o_path)
-        
+
         assert "Saving exposures to" in caplog.text
         # Verify the file exists
         assert o_path.exists()

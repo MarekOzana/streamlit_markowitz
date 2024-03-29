@@ -117,7 +117,7 @@ class DataManager:
         ).with_columns(self.PRICE_COLS)
         return new_prices
 
-    def update_from_yahoo(self) -> None:
+    def update_from_yahoo(self, callback=None) -> None:
         """Update time series for all tickers from yahoo finance"""
         session = self._setup_session()
 
@@ -127,11 +127,14 @@ class DataManager:
             ).alias("start_date")
         )
         is_updated: bool = False
-        for f_row in tbl.rows(named=True):
+        for i, f_row in enumerate(tbl.rows(named=True)):
             new_prices = self._download_data(session, f_row)
             if new_prices is not None:
                 self.t_price = pl.concat([self.t_price, new_prices])
                 is_updated = True
+            if callback:
+                progress = (i + 1) / len(tbl)
+                callback(progress)
 
         # Save the data
         if is_updated:
