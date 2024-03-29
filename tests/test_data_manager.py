@@ -143,7 +143,7 @@ def test_update_from_yahoo(dm: DataManager, caplog: pytest.LogCaptureFixture):
                         "price": [115.0],
                     }
                 ).with_columns(DataManager.PRICE_COLS)
-                 # Use a MagicMock for the callback to check calls
+                # Use a MagicMock for the callback to check calls
                 m_callback = MagicMock()
                 with caplog.at_level(level="DEBUG"):
                     dm.update_from_yahoo(callback=m_callback)
@@ -153,7 +153,7 @@ def test_update_from_yahoo(dm: DataManager, caplog: pytest.LogCaptureFixture):
                 m_write.assert_called_once_with(dm.price_tbl)
                 assert r"Saving data to tests" in caplog.text
                 assert m_callback.call_count == 7
-                m_callback.assert_any_call(1.0/7.0)
+                m_callback.assert_any_call(1.0 / 7.0)
 
 
 def test_set_ret_vol_corr(dm: DataManager):

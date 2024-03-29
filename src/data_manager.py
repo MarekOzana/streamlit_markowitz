@@ -220,7 +220,7 @@ class DataManager:
 
     def get_cumulative_rets(self, name: str) -> pl.DataFrame:
         """Return time series with cumulative returns for single security"""
-        r_cum:pl.DataFrame = (
+        r_cum: pl.DataFrame = (
             self.get_daily_rets(names=[name])
             .fill_null(0)
             .with_columns(cs.by_dtype(pl.Float64).add(1).cum_prod().sub(1))
