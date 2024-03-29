@@ -78,10 +78,11 @@ def create_main_tab(db: DataManager, r_min: float) -> None:
     )
     f_sc = charts.create_scatter_chart(g_data)
     f_w = charts.create_portf_weights_chart(g_data)
-    title = f"Optimal Portf: r={r_opt:0.1%}, vol={vol_opt:0.1%}"
+    title = f"Optimal Portfolio: r={r_opt:0.1%}, vol={vol_opt:0.1%}"
     col1, col2 = st.columns([1.5, 1])
     col1.altair_chart(f_sc, use_container_width=True)
     col2.altair_chart(f_w.properties(title=title), use_container_width=True)
+    st.markdown(title)
 
     # Cumulative returns chart
     r_cum = db.get_cumulative_rets_with_OPT(db.ret_vol["name"].to_list(), w)
@@ -158,8 +159,8 @@ def main() -> None:
         create_edit_assumptions_tab(db)
 
     with tab_fund:
-        r_cum = db.get_cumulative_rets(name='SEB Hybrid')
-        st.line_chart(r_cum, x="date", y=["SEB Hybrid"])
+        df = db.get_cumulative_rets_and_dd(name='SEB Hybrid')
+        st.line_chart(df, x="date", y=["SEB Hybrid", "DrawDown"])
 
     st.divider()
     st.caption(pathlib.Path("data/disclaimer.txt").read_text())

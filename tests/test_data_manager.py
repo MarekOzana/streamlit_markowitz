@@ -241,10 +241,10 @@ def test_last_update(dm: DataManager):
 
 
 def test_get_cumulative_rets(dm: DataManager):
-    r_cum = dm.get_cumulative_rets(name="SEB Hybrid")
+    r_cum = dm.get_cumulative_rets_and_dd(name="SEB Hybrid")
     assert isinstance(r_cum, pl.DataFrame)
-    assert r_cum.columns == ["date", "SEB Hybrid"]
-    assert r_cum.shape == (234, 2)
+    assert r_cum.columns == ["date", "SEB Hybrid", "DrawDown"]
+    assert r_cum.shape == (234, 3)
     assert round(r_cum.item(-1, "SEB Hybrid"), 3) == 0.125
 
 

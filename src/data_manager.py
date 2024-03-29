@@ -218,14 +218,23 @@ class DataManager:
         daily_rets = nav_data.with_columns(cs.by_dtype(pl.Float64).pct_change())
         return daily_rets
 
-    def get_cumulative_rets(self, name: str) -> pl.DataFrame:
-        """Return time series with cumulative returns for single security"""
-        r_cum: pl.DataFrame = (
+    def get_cumulative_rets_and_dd(self, name: str) -> pl.DataFrame:
+        """Return time series with cumulative returns and draw-down for single security"""
+        df: pl.DataFrame = (
             self.get_daily_rets(names=[name])
             .fill_null(0)
-            .with_columns(cs.by_dtype(pl.Float64).add(1).cum_prod().sub(1))
+            .with_columns(pl.col(name).add(1).cum_prod().sub(1))
+            .with_columns(pl.col(name).add(1).cum_max().alias("prev_peaks"))
+            .with_columns(
+                pl.col(name)
+                .add(1)
+                .sub(pl.col("prev_peaks"))
+                .truediv(pl.col("prev_peaks"))
+                .alias("DrawDown")
+            )
+            .select(["date", name, "DrawDown"])
         )
-        return r_cum
+        return df
 
     def get_cumulative_rets_with_OPT(self, names: list, w: np.array) -> pl.DataFrame:
         """Return long dataframe with cumulative returns for each ticker
