@@ -46,12 +46,13 @@ class DataManager:
         self,
         fund_tbl: Path = Path("data/t_fund.csv"),
         price_tbl: Path = Path("data/t_price.parquet"),
+        exp_tbl: Path=Path("data/t_exp.parquet")
     ):
-        self.fund_tbl: Path = Path(fund_tbl)
         self.price_tbl: Path = Path(price_tbl)
         self.lock: FileLock = FileLock(self.price_tbl.with_suffix(".lock"))
 
         self.t_fund = pl.read_csv(fund_tbl).with_columns(self.FUND_COLS)
+        self.t_exp = pl.read_parquet(exp_tbl)
         with self.lock:
             self.t_price = pl.read_parquet(price_tbl).with_columns(self.PRICE_COLS)
         self.set_ret_vol_corr(self.names())  # initialize

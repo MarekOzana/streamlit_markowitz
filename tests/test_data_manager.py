@@ -32,7 +32,6 @@ def dm():
 
 
 def test__init__(dm: DataManager):
-    assert dm.fund_tbl == Path("tests/data/t_fund.csv")
     assert dm.price_tbl == Path("tests/data/t_price.parquet")
     assert dm.t_fund.shape == (7, 6)
     assert dm.t_fund.columns == [
