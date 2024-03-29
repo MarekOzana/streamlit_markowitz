@@ -40,7 +40,7 @@ def test__init__(dm: DataManager):
         "name",
         "long_name",
         "yahoo",
-        "ticker",
+        "portf",
         "exp_ret",
     ]
     assert dm.t_price.shape == (1881, 3)
@@ -254,12 +254,52 @@ def test_get_cumulative_rets_with_OPT(dm: DataManager):
 
 
 class TestUpdater:
-    def test_import_fund_info(self):
+    @pytest.fixture
+    def updater(self):
         f_name = Path("tests/data/M_Funds.csv")
-        u = Updater(f_name)
-        
-        assert isinstance(u.tbl, pl.LazyFrame)
-        tbl = u.tbl.collect()
+        return Updater(f_name)
+
+    def test_save_t_exp_table(self, updater: Updater, tmp_path: Path):
+        o_path: Path = tmp_path / "test_t_exp.parquet"
+        updater.save_t_exp_table(o_name=o_path)
+
+        # Verify the file exists
+        assert o_path.exists()
+
+        # Load the parquet file and verify its contents (optional)
+        df = pl.read_parquet(o_path)
+        assert df.shape == (8, 5)
+        assert df.with_columns(cs.by_dtype(pl.Float64).round(2)).to_dict(
+            as_series=False
+        ) == {
+            "portf": [
+                "HYBRID",
+                "HYBRID",
+                "HYBRID",
+                "HYBRID",
+                "EURHYL HOLD",
+                "EURHYL HOLD",
+                "EURHYL HOLD",
+                "EURHYL HOLD",
+            ],
+            "m_rating": ["BBB", "BBB", "BBB", "Cash", "BB", "BB", "B", "Cash"],
+            "rating": ["BBB", "BBB-", "BBB-", "AA+", "BB+", "BB+", "B+", "AA+"],
+            "ticker": [
+                "DNBNO",
+                "SEB",
+                "RABOBK",
+                "Cash",
+                "KBCBB",
+                "VOD",
+                "TITIM",
+                "Cash",
+            ],
+            "mv_pct": [0.03, 0.02, 0.01, 0.04, 0.01, 0.0, 0.01, 0.03],
+        }
+
+    def test_import_fund_info(self, updater: Updater):
+        assert isinstance(updater.tbl, pl.LazyFrame)
+        tbl = updater.tbl.collect()
         assert tbl.shape == (10, 23)
         assert tbl["rating"].to_list() == [
             "BBB-",
@@ -273,9 +313,3 @@ class TestUpdater:
             "B+",
             "AA+",
         ]
-    
-    def test_get_exp_table(self):
-        f_name = Path("tests/data/M_Funds.csv")
-        u = Updater(f_name)
-        df_exp = u.get_exp_table()
-        assert df_exp.shape == (8, 5)

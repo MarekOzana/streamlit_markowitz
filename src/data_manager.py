@@ -33,7 +33,7 @@ class DataManager:
         pl.col("name").cast(pl.Utf8),
         pl.col("long_name").cast(pl.Utf8),
         pl.col("yahoo").cast(pl.Utf8),
-        pl.col("ticker").cast(pl.Utf8),
+        pl.col("portf").cast(pl.Utf8),
         pl.col("exp_ret").cast(pl.Float64),
     ]
     PRICE_COLS: list = [
@@ -364,6 +364,14 @@ class Updater:
     )
 
     def __init__(self, f_name: Path) -> None:
+        """
+        Parse external CSV files and prepare tables
+
+        Usage
+        -----
+        >>> u = Updater(f_name='tests/data/M_Fund.csv')
+        >>> u.save_t_exp_table(o_name='data/t_exp.parquet')
+        """
         self.tbl: pl.LazyFrame = self._import_fund_info(f_name)
 
     def _import_fund_info(self, f_name: Path) -> pl.LazyFrame:
@@ -430,8 +438,9 @@ class Updater:
         )
         return tbl
 
-    def get_exp_table(self) -> pl.DataFrame:
-        df_exp = (
+    def save_t_exp_table(self, o_name: Path = Path("data/t_exp.parquet")) -> None:
+        """Create and save exposure table to o_name"""
+        df_exp: pl.LazyFrame = (
             self.tbl.group_by(["portf", "m_rating", "rating", "ticker"])
             .agg(pl.col("mv_pct").sum().mul(0.01))
             .filter(pl.col("ticker").is_not_null())
@@ -444,4 +453,5 @@ class Updater:
                 nulls_last=True,
             )
         )
-        return df_exp.collect()
+        logger.info(f"Saving exposures to {o_name}")
+        df_exp.collect().write_parquet(o_name)

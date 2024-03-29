@@ -1,4 +1,4 @@
-id,name,long_name,yahoo,ticker,exp_ret
+id,name,long_name,yahoo,portf,exp_ret
 1,SEB Hybrid,SEB Hybrid Capital Bond Fund R-EUR,0P0001QM99.F,HYBRID,0.078
 2,T-Bills,Lazard Euro Short Term Money Market,0P0000XBX1.F,,0.04
 3,Corps,Invesco Euro Corporate Bond A EUR,0P00005Z2A.F,,0.044
