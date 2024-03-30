@@ -50,6 +50,10 @@ def get_params(db: DataManager) -> float:
         default=db.names()[:-1],
         help="Select Names",
     )
+    if not tickers:
+        tickers = db.names()
+        st.warning("At least one ticker must be selected...")
+
     # Set tickers
     if ("tickers" not in st.session_state) or (tickers != st.session_state["tickers"]):
         st.session_state["tickers"] = tickers
@@ -159,8 +163,13 @@ def main() -> None:
         create_edit_assumptions_tab(db)
 
     with tab_fund:
-        df = db.get_cumulative_rets_and_dd(name='SEB Hybrid')
-        st.line_chart(df, x="date", y=["SEB Hybrid", "DrawDown"])
+        col1, col2 = st.columns([4, 1])
+        fund_name = col2.selectbox(
+            label="Fund", options=db.names(), label_visibility="collapsed"
+        )
+        df = db.get_cumulative_rets_and_dd(name=fund_name)
+        fig = charts.create_cumul_ret_with_drawdown_chart(df)
+        col1.altair_chart(fig, use_container_width=True)
 
     st.divider()
     st.caption(pathlib.Path("data/disclaimer.txt").read_text())

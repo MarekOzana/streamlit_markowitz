@@ -1,5 +1,5 @@
 """
-CHarts for Markowitz Optimization Visualization
+Charts for Markowitz Optimization Visualization
 
 .. author:: Marek Ozana
 .. date:: 2024-03
@@ -177,4 +177,39 @@ def create_cum_ret_chart(r_cum: pl.DataFrame) -> alt.Chart:
         .transform_filter(alt.datum.is_last)
     )
     fig = line + text
+    return fig
+
+
+def create_cumul_ret_with_drawdown_chart(df: pl.DataFrame) -> alt.LayerChart:
+    """Create cumulative return for single time series including drwadowns
+
+    Parameters
+    ----------
+    df: pl.DataFrame
+        expected columns ["date", name, "DrawDown]
+    """
+    name: str = df.columns[1]
+    base = alt.Chart(df.to_pandas()).encode(
+        x=alt.X("date:T").title(None),
+        tooltip=[
+            "date:T",
+            alt.Tooltip(name, format="0.2%"),
+            alt.Tooltip("DrawDown:Q", format="0.2%"),
+        ],
+    )
+    f_ret = base.mark_line().encode(y=alt.Y(f"{name}:Q").axis(format="%").title(name))
+    f_dd = base.mark_area(
+        color=alt.Gradient(
+            gradient="linear",
+            stops=[
+                alt.GradientStop(color="firebrick", offset=0),
+                alt.GradientStop(color="white", offset=1),
+            ],
+            x1=1,
+            x2=1,
+            y1=1,
+            y2=0,
+        ),
+    ).encode(y=alt.Y("DrawDown").axis(format="%").title(""))
+    fig = f_dd + f_ret
     return fig

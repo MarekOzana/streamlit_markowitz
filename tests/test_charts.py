@@ -71,3 +71,14 @@ def test_create_cum_ret_chart():
     assert f_line.title == "Cumulative Returns"
     assert f_line.mark == "line"
     assert isinstance(f_text, alt.Chart)
+
+
+def test_create_cumul_ret_with_drawdown_chart():
+    df = pl.read_parquet("tests/data/df_r_cum_with_dd.parquet")
+    fig = src.charts.create_cumul_ret_with_drawdown_chart(df)
+    assert isinstance(fig, alt.LayerChart)
+    f_dd, f_ret = fig.layer
+    assert isinstance(f_dd, alt.Chart)
+    assert f_dd.mark.type == "area"
+    assert isinstance(f_ret, alt.Chart)
+    assert f_ret.mark == "line"
