@@ -15,6 +15,9 @@ import logging
 import os
 from pathlib import Path
 from datetime import date
+import datetime
+import re
+from typing import Optional
 
 from filelock import FileLock
 import certifi
@@ -415,7 +418,39 @@ class Updater:
         >>> u.save_t_exp_table(o_name='data/t_exp.parquet')
         """
         self.tbl: pl.LazyFrame = self._import_fund_info(f_name)
+        self.as_of: date = self._extract_report_date(f_name)
         # TODO: insert key figures and date
+
+    def _extract_report_date(self, f_name: Path) -> Optional[date]:
+        """
+        Extracts the report date from a text file.
+
+        This function searches for a date in the format M/D/YYYY that follows
+        the phrase "Report Period" in the provided text file.
+
+        Parameters:
+        f_name (Path): The path to the text file from which the date is to be extracted.
+
+        Returns:
+        Optional[date]: The extracted date as a datetime.date object or None if no date is found.
+        """
+
+        # Define the regex pattern to find the date in the format M/D/YYYY
+        date_pattern = r"Report Period.*?(\d{1,2}/\d{1,2}/\d{4})"
+
+        # Open and read the content of the file
+        with open(f_name, "r") as file:
+            content = file.read()
+
+            # Search for the date pattern in the file content
+            match = re.search(date_pattern, content)
+
+            # If a match is found, convert the matched string to a date object
+            if match:
+                return datetime.datetime.strptime(match.group(1), "%m/%d/%Y").date()
+
+        # Return None if no date is found
+        return None
 
     def _import_fund_info(self, f_name: Path) -> pl.LazyFrame:
         """

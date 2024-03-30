@@ -341,3 +341,6 @@ class TestUpdater:
             "B+",
             "AA+",
         ]
+
+    def test__extract_report_date(self, updater: Updater):
+        assert updater.as_of == datetime.date(2024, 3, 27)
