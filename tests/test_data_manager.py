@@ -19,6 +19,7 @@ from numpy.testing import assert_array_almost_equal
 
 from src.data_manager import DataManager
 from src.data_manager import Updater
+import src.data_manager
 
 
 # Fixture to create a DataManager instance
@@ -56,7 +57,15 @@ def test__init__(dm: DataManager):
     ]
     assert dm.ret_vol.shape == (7, 4)
     assert isinstance(dm.t_exp, pl.DataFrame)
-    assert dm.t_exp.shape == (139, 5)
+    assert dm.t_exp.shape == (139, 6)
+    assert dm.t_exp.columns == [
+        "portf",
+        "m_rating",
+        "rating",
+        "ticker",
+        "mv_pct",
+        "date",
+    ]
 
 
 def test_setup_session_with_proxy(dm: DataManager):
@@ -268,9 +277,10 @@ def test_get_cumulative_rets_with_OPT(dm: DataManager):
 
 def test_get_fund_exposures(dm: DataManager):
     df = dm.get_fund_exposures(name="SEB Hybrid")
-    assert df.shape == (58, 4)
+    assert df.shape == (58, 5)
     assert df[-2].to_dict(as_series=False) == {
         "name": ["SEB Hybrid"],
+        "date": [datetime.date(2024, 3, 27)],
         "m_rating": ["BB"],
         "ticker": ["LLOYDS"],
         "mv_pct": [0.0021],
@@ -283,6 +293,26 @@ class TestUpdater:
         f_name = Path("tests/data/M_Funds.csv")
         return Updater(f_name)
 
+    def test_import_fund_info(self, updater: Updater):
+        assert isinstance(updater.tbl, pl.LazyFrame)
+        tbl = updater.tbl.collect()
+        assert tbl.shape == (10, 23)
+        assert tbl["rating"].to_list() == [
+            "BBB-",
+            "BBB",
+            "BBB-",
+            "BBB-",
+            "AA+",
+            "BB+",
+            "BB+",
+            "BB+",
+            "B+",
+            "AA+",
+        ]
+
+    def test__extract_report_date(self, updater: Updater):
+        assert updater.as_of == datetime.date(2024, 3, 27)
+
     def test_save_t_exp_table(
         self, updater: Updater, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ):
@@ -290,16 +320,26 @@ class TestUpdater:
         with caplog.at_level(level="DEBUG"):
             updater.save_t_exp_table(o_name=o_path)
 
-        assert "Saving exposures to" in caplog.text
+        assert "Saving (8, 6) exposures to" in caplog.text
         # Verify the file exists
         assert o_path.exists()
 
         # Load the parquet file and verify its contents (optional)
         df = pl.read_parquet(o_path)
-        assert df.shape == (8, 5)
+        assert df.shape == (8, 6)
         assert df.with_columns(cs.by_dtype(pl.Float64).round(2)).to_dict(
             as_series=False
         ) == {
+            "date": [
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+            ],
             "portf": [
                 "HYBRID",
                 "HYBRID",
@@ -325,22 +365,67 @@ class TestUpdater:
             "mv_pct": [0.03, 0.02, 0.01, 0.04, 0.01, 0.0, 0.01, 0.03],
         }
 
-    def test_import_fund_info(self, updater: Updater):
-        assert isinstance(updater.tbl, pl.LazyFrame)
-        tbl = updater.tbl.collect()
-        assert tbl.shape == (10, 23)
-        assert tbl["rating"].to_list() == [
-            "BBB-",
-            "BBB",
-            "BBB-",
-            "BBB-",
-            "AA+",
-            "BB+",
-            "BB+",
-            "BB+",
-            "B+",
-            "AA+",
-        ]
+    def test_save_t_keyfigures_table(
+        self, updater: Updater, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ):
+        o_path: Path = tmp_path / "test_t_keyfigures.parquet"
+        with caplog.at_level(level="DEBUG"):
+            updater.save_t_keyfigures_table(o_name=o_path)
 
-    def test__extract_report_date(self, updater: Updater):
-        assert updater.as_of == datetime.date(2024, 3, 27)
+        assert "Saving (8, 4) key figures to" in caplog.text
+        # Verify the file exists
+        assert o_path.exists()
+
+        # Load the parquet file and verify its contents (optional)
+        df = pl.read_parquet(o_path)
+        assert df.shape == (8, 4)
+        assert df.columns == ["date", "portf", "key", "value"]
+        assert df.to_dict(as_series=False) == {
+            "date": [
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+            ],
+            "portf": [
+                "EURHYL HOLD",
+                "EURHYL HOLD",
+                "EURHYL HOLD",
+                "EURHYL HOLD",
+                "HYBRID",
+                "HYBRID",
+                "HYBRID",
+                "HYBRID",
+            ],
+            "key": ["oas", "ytc", "ytw", "zspread", "oas", "ytc", "ytw", "zspread"],
+            "value": [314.27, 218.91, 6.88, 369.9, 329.62, 7.34, 7.18, 346.97],
+        }
+
+
+class TestCLI:
+    """Unit tests on command line interface for Updater"""
+
+    @patch("src.data_manager.Updater")
+    def test_main(self, m_updater, caplog: pytest.LogCaptureFixture):
+        m_instance = MagicMock()
+        m_updater.return_value = m_instance
+        test_args = ["data_manager.py", "-f", "M_Funds.csv"]
+        with patch("sys.argv", test_args):
+            src.data_manager.main()
+        # Check if Updater was called correctly
+        m_updater.assert_called_once_with("M_Funds.csv")
+
+        # Verify that save_t_exp_table and save_t_keyfigures_table were called
+        m_instance.save_t_exp_table.assert_called_once_with(
+            o_name=Path("data/t_exp.parquet")
+        )
+        m_instance.save_t_keyfigures_table.assert_called_once_with(
+            o_name=Path("data/t_keyfigures.parquet")
+        )
+
+        # Check logging message
+        assert "DONE" in caplog.text

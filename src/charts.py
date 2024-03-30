@@ -224,9 +224,10 @@ def create_exp_chart(df: pl.DataFrame) -> alt.Chart:
     ----------
     df: pl.DataFrame(name, m_rating, ticker, m_pct)
     """
+    as_of: date = df["date"].item(0)
     brush = alt.selection_point(fields=["m_rating"])
     rtgs = df["m_rating"].unique().to_list()
-    base = alt.Chart(df).encode(
+    base = alt.Chart(df.drop(columns="date")).encode(
         color=alt.Color("m_rating:O").sort(rtgs).scale(scheme="blueorange")
     )
     f_rtg = (
@@ -254,7 +255,7 @@ def create_exp_chart(df: pl.DataFrame) -> alt.Chart:
             rank="rank(mv_pct)", sort=[alt.SortField("mv_pct", order="descending")]
         )
         .transform_filter((alt.datum.rank <= 18))
-        .properties(title="Largest Ticker Exposures")
+        .properties(title=f"Largest Ticker Exposures (as of {as_of:%F})")
     )
     fig = f_rtg | f_ticker
     return fig

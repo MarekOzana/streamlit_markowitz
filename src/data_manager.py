@@ -11,6 +11,7 @@ downloads are based on yfinance. if proxy is needed then set YFIN_PROXY env
 .. date:: 2024-03
 """
 
+import argparse
 import logging
 import os
 from pathlib import Path
@@ -284,7 +285,7 @@ class DataManager:
         df = (
             self.t_exp.join(self.t_fund, on="portf")
             .filter(pl.col("name") == name)
-            .select(["name", "m_rating", "ticker", "mv_pct"])
+            .select(["name", "date", "m_rating", "ticker", "mv_pct"])
             .with_columns(pl.col("m_rating").fill_null("NR"))
         )
         return df
@@ -414,11 +415,12 @@ class Updater:
 
         Usage
         -----
-        >>> u = Updater(f_name='tests/data/M_Fund.csv')
+        >>> u = Updater(f_name='tests/data/M_Funds.csv')
         >>> u.save_t_exp_table(o_name='data/t_exp.parquet')
         """
-        self.tbl: pl.LazyFrame = self._import_fund_info(f_name)
         self.as_of: date = self._extract_report_date(f_name)
+        logger.info(f"Parsing {f_name} as of {self.as_of:%F}")
+        self.tbl: pl.LazyFrame = self._import_fund_info(f_name)
         # TODO: insert key figures and date
 
     def _extract_report_date(self, f_name: Path) -> Optional[date]:
@@ -432,7 +434,7 @@ class Updater:
         f_name (Path): The path to the text file from which the date is to be extracted.
 
         Returns:
-        Optional[date]: The extracted date as a datetime.date object or None if no date is found.
+        Optional[date]: The extracted date as a datetime.date object or None
         """
 
         # Define the regex pattern to find the date in the format M/D/YYYY
@@ -521,7 +523,7 @@ class Updater:
         df_exp: pl.DataFrame = (
             self.tbl.group_by(["portf", "m_rating", "rating", "ticker"])
             .agg(pl.col("mv_pct").sum().mul(0.01))
-            .filter(pl.col("ticker").is_not_null())
+            .filter(pl.col("ticker").is_not_null())  # Remove totals
             .sort(
                 "portf",
                 "m_rating",
@@ -530,7 +532,42 @@ class Updater:
                 descending=[True, False, False, True],
                 nulls_last=True,
             )
+            .with_columns(pl.lit(self.as_of).alias("date"))  # add as of date
             .collect()
         )
-        logger.info(f"Saving exposures to {o_name}")
+        logger.info(f"Saving {df_exp.shape} exposures to {o_name}")
         df_exp.write_parquet(o_name)
+
+    def save_t_keyfigures_table(
+        self, o_name: Path = Path("data/t_keyfigures.parquet")
+    ) -> None:
+        """Create and save Key Figures to o_name"""
+        df_kf: pl.DataFrame = (
+            self.tbl.filter(pl.col("ticker").is_null())
+            .select(["portf", "ytc", "ytw", "oas", "zspread"])
+            .with_columns(pl.lit(self.as_of).alias("date"))
+            .melt(id_vars=["date", "portf"], variable_name="key")
+            .with_columns(pl.col("value").cast(pl.Float64))
+            .sort(by=["date", "portf", "key"])
+            .collect()
+        )
+        logger.info(f"Saving {df_kf.shape} key figures to {o_name}")
+        df_kf.write_parquet(o_name)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Update Exposures and KeyFigures")
+    parser.add_argument("-f", "--file", required=True, help="M_Funds.csv file")
+
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO)
+    logger.setLevel(logging.INFO)
+    u = Updater(args.file)
+    u.save_t_exp_table(o_name=Path("data/t_exp.parquet"))
+    u.save_t_keyfigures_table(o_name=Path("data/t_keyfigures.parquet"))
+    logger.info("DONE")
+
+
+if __name__ == "__main__":
+    main()

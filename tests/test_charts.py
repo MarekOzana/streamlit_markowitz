@@ -93,6 +93,6 @@ def test_create_exp_chart():
     assert f_rtg.mark.type == "bar"
     assert isinstance(f_ticker, alt.Chart)
     assert f_ticker.mark == "bar"
-    assert f_ticker.title == "Largest Ticker Exposures"
+    assert f_ticker.title == "Largest Ticker Exposures (as of 2024-03-27)"
     assert f_ticker.encoding.x.shorthand == "mv_pct:Q"
     assert f_ticker.encoding.y.shorthand == "ticker:N"
