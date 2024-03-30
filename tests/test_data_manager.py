@@ -27,6 +27,7 @@ def dm():
     dm = DataManager(
         fund_tbl=Path("tests/data/t_fund.csv"),
         price_tbl=Path("tests/data/t_price.parquet"),
+        exp_tbl=Path("tests/data/t_exp.parquet"),
     )
     return dm
 
@@ -54,6 +55,8 @@ def test__init__(dm: DataManager):
         "Asset Selection",
     ]
     assert dm.ret_vol.shape == (7, 4)
+    assert isinstance(dm.t_exp, pl.DataFrame)
+    assert dm.t_exp.shape == (139, 5)
 
 
 def test_setup_session_with_proxy(dm: DataManager):
@@ -260,6 +263,17 @@ def test_get_cumulative_rets_with_OPT(dm: DataManager):
         "date": [datetime.date(2024, 3, 15), datetime.date(2024, 3, 18)],
         "name": ["OPTIMAL", "OPTIMAL"],
         "return": [0.1024, 0.1021],
+    }
+
+
+def test_get_fund_exposures(dm: DataManager):
+    df = dm.get_fund_exposures(name="SEB Hybrid")
+    assert df.shape == (58, 4)
+    assert df[-2].to_dict(as_series=False) == {
+        "name": ["SEB Hybrid"],
+        "m_rating": ["BB"],
+        "ticker": ["LLOYDS"],
+        "mv_pct": [0.0021],
     }
 
 

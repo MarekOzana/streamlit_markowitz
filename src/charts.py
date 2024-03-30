@@ -213,3 +213,48 @@ def create_cumul_ret_with_drawdown_chart(df: pl.DataFrame) -> alt.LayerChart:
     ).encode(y=alt.Y("DrawDown").axis(format="%").title(""))
     fig = f_dd + f_ret
     return fig
+
+
+def create_exp_chart(df: pl.DataFrame) -> alt.Chart:
+    """
+    Create an interactive chart selecting ratings on left
+    and showing largest ticker exposures on right
+
+    Parameters
+    ----------
+    df: pl.DataFrame(name, m_rating, ticker, m_pct)
+    """
+    brush = alt.selection_point(fields=["m_rating"])
+    rtgs = df["m_rating"].unique().to_list()
+    base = alt.Chart(df).encode(
+        color=alt.Color("m_rating:O").sort(rtgs).scale(scheme="blueorange")
+    )
+    f_rtg = (
+        base.mark_bar(stroke="grey")
+        .encode(
+            x=alt.X("m_rating:O").title("Rating").sort(rtgs),
+            y=alt.Y("sum(mv_pct):Q").axis(format="%").title("Rating Exposure"),
+            opacity=alt.condition(brush, alt.value(1), alt.value(0.3)),
+            tooltip=["m_rating:O", alt.Tooltip("sum(mv_pct):Q", format="0.2%")],
+        )
+        .add_params(brush)
+    )
+    f_ticker = (
+        base.mark_bar()
+        .encode(
+            x=alt.X("mv_pct:Q").axis(format="%").title("Exposure"),
+            y=alt.Y("ticker:N").title(None).sort("-x"),
+            tooltip=[
+                "ticker:N",
+                alt.Tooltip("mv_pct:Q", aggregate="sum", format="0.2%"),
+            ],
+        )
+        .transform_filter(brush)
+        .transform_window(
+            rank="rank(mv_pct)", sort=[alt.SortField("mv_pct", order="descending")]
+        )
+        .transform_filter((alt.datum.rank <= 18))
+        .properties(title="Largest Ticker Exposures")
+    )
+    fig = f_rtg | f_ticker
+    return fig

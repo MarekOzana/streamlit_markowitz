@@ -82,3 +82,17 @@ def test_create_cumul_ret_with_drawdown_chart():
     assert f_dd.mark.type == "area"
     assert isinstance(f_ret, alt.Chart)
     assert f_ret.mark == "line"
+
+
+def test_create_exp_chart():
+    df = pl.read_parquet("tests/data/df_chart_exp.parquet")
+    fig = src.charts.create_exp_chart(df)
+    assert isinstance(fig, alt.HConcatChart)
+    f_rtg, f_ticker = fig.hconcat
+    assert isinstance(f_rtg, alt.Chart)
+    assert f_rtg.mark.type == "bar"
+    assert isinstance(f_ticker, alt.Chart)
+    assert f_ticker.mark == "bar"
+    assert f_ticker.title == "Largest Ticker Exposures"
+    assert f_ticker.encoding.x.shorthand == "mv_pct:Q"
+    assert f_ticker.encoding.y.shorthand == "ticker:N"

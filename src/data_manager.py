@@ -267,6 +267,25 @@ class DataManager:
         )
         return r_cum
 
+    def get_fund_exposures(self, name: str) -> pl.DataFrame:
+        """Get fund exposures
+        Params
+        ------
+        name: str
+            fund name
+
+        Returns
+        -------
+        df: pl.DataFrame (m_rating, ticker, mv_pct)
+        """
+        df = (
+            self.t_exp.join(self.t_fund, on="portf")
+            .filter(pl.col("name") == name)
+            .select(["name", "m_rating", "ticker", "mv_pct"])
+            .with_columns(pl.col("m_rating").fill_null("NR"))
+        )
+        return df
+
 
 class Updater:
     PREP2COLS: dict[str, str] = {

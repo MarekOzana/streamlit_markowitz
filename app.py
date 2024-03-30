@@ -141,6 +141,26 @@ def create_edit_assumptions_tab(db: DataManager) -> None:
         st.rerun()  # Make sure the values are updated
 
 
+def create_fund_info_tab(db):
+    col1, col2 = st.columns([4, 1])
+    with col2:
+        # Select & Statistics
+        name = st.selectbox("Fund", options=db.names(), label_visibility="collapsed")
+    with col1:
+        # Performance and DrawDowns
+        df = db.get_cumulative_rets_and_dd(name=name)
+        fig = charts.create_cumul_ret_with_drawdown_chart(df)
+        col1.altair_chart(fig, use_container_width=True)
+
+        # Rating and Ticker Exposures
+    df = db.get_fund_exposures(name=name)
+    if len(df) > 0:
+        fig = charts.create_exp_chart(df)
+        st.altair_chart(fig, use_container_width=True)
+    else:
+        st.info(f"Exposure info NOT available for {name}")
+
+
 @st.cache_resource
 def get_db() -> DataManager:
     db = DataManager()
@@ -163,13 +183,7 @@ def main() -> None:
         create_edit_assumptions_tab(db)
 
     with tab_fund:
-        col1, col2 = st.columns([4, 1])
-        fund_name = col2.selectbox(
-            label="Fund", options=db.names(), label_visibility="collapsed"
-        )
-        df = db.get_cumulative_rets_and_dd(name=fund_name)
-        fig = charts.create_cumul_ret_with_drawdown_chart(df)
-        col1.altair_chart(fig, use_container_width=True)
+        create_fund_info_tab(db)
 
     st.divider()
     st.caption(pathlib.Path("data/disclaimer.txt").read_text())
