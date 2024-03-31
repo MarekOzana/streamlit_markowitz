@@ -13,6 +13,9 @@ Users can change underlying assumptions about expected returns, volatilities, an
 - **Results**: The app displays the optimal allocation among the selected funds to achieve the desired return with minimum risk.
 
 ## How to run
+[https://markowitz.streamlit.app/](https://markowitz.streamlit.app/)
+
+or locally:
 ```bash
 >>> streamlit run app.py
 ```
