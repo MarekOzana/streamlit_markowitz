@@ -7,6 +7,7 @@ Charts for Markowitz Optimization Visualization
 
 import altair as alt
 import polars as pl
+import pandas as pd
 import numpy as np
 from scipy.stats import norm
 from datetime import date
@@ -85,20 +86,15 @@ def create_exp_ret_chart(
         tuple(alt.Chart, alt.Chart)
     """
     # Prepare DataFrame with dates, time (in years), exp returns and probabilities
-    month = np.arange(0, n + 1, step=1)
-    t = month.astype(np.float64) / 12.0
-    t[0] = 1e-15
     today = date.today()
+    dates = pd.date_range(start=today, periods=n, freq=pd.offsets.BMonthEnd())
+    t = np.array([(day.date() - today).days / 364 for day in dates])
+    t[0] += 1e-15
+
     n_std: float = norm.ppf(0.95)  # number of standard deviations for 95%
     g_data: pl.DataFrame = pl.DataFrame(
         {
-            "month": month,
-            "date": pl.date_range(
-                today,
-                date(today.year + n // 12, (today.month + n + 1) % 12, 1),
-                "1mo",
-                eager=True,
-            ),
+            "date": dates,
             # Lowest expected return with 95% probability
             "Worst (95%)": np.exp(r_ann * t - n_std * vol_ann * np.sqrt(t)) - 1,
             # Expected return
@@ -227,7 +223,7 @@ def create_exp_chart(df: pl.DataFrame) -> alt.Chart:
     as_of: date = df["date"].item(0)
     brush = alt.selection_point(fields=["m_rating"])
     rtgs = df["m_rating"].unique().to_list()
-    base = alt.Chart(df.drop(columns="date")).encode(
+    base = alt.Chart(df.drop("date")).encode(
         color=alt.Color("m_rating:O").sort(rtgs).scale(scheme="blueorange")
     )
     f_rtg = (
