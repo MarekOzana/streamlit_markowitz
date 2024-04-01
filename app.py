@@ -3,16 +3,18 @@ Markowitz Optimization on Funds
 author: 2024-03 Marek Ozana
 """
 
+import logging
 import pathlib
 
+import numpy as np
 import polars as pl
 import polars.selectors as cs
-
 import streamlit as st
-import logging
-from src.data_manager import DataManager
+from scipy.stats import norm
+
 import src.charts as charts
 import src.optimization as opt
+from src.data_manager import DataManager
 
 st.set_page_config(
     page_title="Markowitz Optimizer", layout="wide", page_icon="data/icon.png"
@@ -85,17 +87,30 @@ def create_main_tab(db: DataManager, r_min: float) -> None:
     title = f"Optimal Portfolio: r={r_opt:0.1%}, vol={vol_opt:0.1%}"
     col1, col2 = st.columns([1.5, 1])
     col1.altair_chart(f_sc, use_container_width=True)
-    col2.altair_chart(f_w.properties(title=title), use_container_width=True)
-    st.markdown(title)
+    col2.altair_chart(f_w.properties(title=title, height=350), use_container_width=True)
+    st.markdown(
+        f"""
+        ### Optimal Portfolio Statistics
+        * **Expected Return in 1y** = {r_opt:0.1%}
+        * **Expected volatility** = {vol_opt:0.1%}
+        * 95%-prob Lowest Expected Return in 1y = {(r_opt - norm.ppf(0.95)*vol_opt):0.1%}
+        * 99%-prob Lowest Expected Return in 1y = {(r_opt - norm.ppf(0.99)*vol_opt):0.1%}
+
+        **Probability of Negative Returns:**
+        * in 1 month = {norm.cdf(0, r_opt/12.0, scale=vol_opt*np.sqrt(1/12.0)):0.0%}
+        * in 1 quarter = {norm.cdf(0, 3*r_opt/12.0, scale=vol_opt*np.sqrt(3/12.0)):0.0%}
+        * in 1 year  = {norm.cdf(0, r_opt, scale=vol_opt):0.1%}
+        * in 2 years = {norm.cdf(0, 2*r_opt, scale=vol_opt*np.sqrt(2)):0.2%}
+        """
+    )
 
     # Cumulative returns chart
     r_cum = db.get_cumulative_rets_with_OPT(db.ret_vol["name"].to_list(), w)
     fig = charts.create_cum_ret_chart(r_cum)
     st.altair_chart(fig, use_container_width=True)
 
-    # Create chart with expected returns & Prob of negative returns
-    r_fig, p_fig = charts.create_exp_ret_chart(r_ann=r_opt, vol_ann=vol_opt, n=36)
-    st.altair_chart(r_fig, use_container_width=True)
+    # Create chart with Prob of negative returns
+    p_fig = charts.create_prob_of_neg_chart(r_ann=r_opt, vol_ann=vol_opt, n=36)
     st.altair_chart(p_fig, use_container_width=True)
 
 

@@ -7,10 +7,9 @@ Charts for Markowitz Optimization Visualization
 
 import altair as alt
 import polars as pl
-import pandas as pd
 import numpy as np
 from scipy.stats import norm
-from datetime import date
+from datetime import date, timedelta
 
 
 def create_scatter_chart(g_data: pl.DataFrame) -> alt.LayerChart:
@@ -43,8 +42,8 @@ def create_scatter_chart(g_data: pl.DataFrame) -> alt.LayerChart:
 def create_portf_weights_chart(g_data: pl.DataFrame):
     base = (
         alt.Chart(g_data, title="Optimal Portfolio").encode(
-            x=alt.X("name:N").title(None),
-            y=alt.Y("w_opt")
+            y=alt.Y("name:N").title(None).sort("-x"),
+            x=alt.X("w_opt")
             .title("Optimal Weight")
             .axis(format="%")
             .scale(domain=[0, 1], scheme="blueorange"),
@@ -68,12 +67,12 @@ def create_portf_weights_chart(g_data: pl.DataFrame):
     return fig
 
 
-def create_exp_ret_chart(
-    r_ann: float = 0.05,
+def create_prob_of_neg_chart(
+    r_ann: float = 0.088,
     vol_ann: float = 0.08,
     n: int = 12,
-) -> tuple:
-    """Plot Expected returns and Probability of negative returns
+) -> alt.Chart:
+    """Plot Probability of negative returns
 
     Parameters
     ==========
@@ -87,18 +86,25 @@ def create_exp_ret_chart(
     """
     # Prepare DataFrame with dates, time (in years), exp returns and probabilities
     today = date.today()
-    dates = pd.date_range(start=today, periods=n, freq=pd.offsets.BMonthEnd())
-    t = np.array([(day.date() - today).days / 364 for day in dates])
+    dates = pl.date_range(
+        start=today,
+        end=today + timedelta(days=365 * n // 12),
+        interval="1mo",
+        eager=True
+    )
+    # dates = pd.date_range(start=today, periods=n, freq=pd.offsets.BMonthEnd())
+    t = np.array([(day - today).days / 364 for day in dates])
     t[0] += 1e-15
 
     n_std: float = norm.ppf(0.95)  # number of standard deviations for 95%
     g_data: pl.DataFrame = pl.DataFrame(
         {
             "date": dates,
-            # Lowest expected return with 95% probability
-            "Worst (95%)": np.exp(r_ann * t - n_std * vol_ann * np.sqrt(t)) - 1,
+            "t": t,
             # Expected return
             "Expected": np.exp(r_ann * t) - 1,
+            # Lowest expected return with 95% probability
+            "Worst (95%)": np.exp(r_ann * t - n_std * vol_ann * np.sqrt(t)) - 1,
             # Probability of negative return
             "p_neg": norm.cdf(0, loc=r_ann * t, scale=vol_ann * np.sqrt(t)),
         }
@@ -108,20 +114,20 @@ def create_exp_ret_chart(
     base = alt.Chart(g_data.to_pandas()).encode(
         x=alt.X("yearmonth(date):T").title(None)
     )
-    r_fig = (
-        base.transform_fold(["Expected", "Worst (95%)"], as_=["Type of Return", "ret"])
-        .mark_line()
-        .encode(
-            y=alt.Y("ret:Q").title("Return [%]").axis(format="%"),
-            color=alt.Color("Type of Return:N"),
-            tooltip=[
-                "date:T",
-                "Type of Return:N",
-                alt.Tooltip("ret:Q").format("0.2%"),
-            ],
-        )
-        .properties(title="Expected and Worst (95%) Returns")
-    )
+    # r_fig = (
+    #     base.transform_fold(["Expected", "Worst (95%)"], as_=["Type of Return", "ret"])
+    #     .mark_line()
+    #     .encode(
+    #         y=alt.Y("ret:Q").title("Return [%]").axis(format="%"),
+    #         color=alt.Color("Type of Return:N"),
+    #         tooltip=[
+    #             "date:T",
+    #             "Type of Return:N",
+    #             alt.Tooltip("ret:Q").format("0.2%"),
+    #         ],
+    #     )
+    #     .properties(title="Expected and Worst (95%) Returns")
+    # )
 
     p_fig = (
         base.mark_bar()
@@ -135,7 +141,7 @@ def create_exp_ret_chart(
         )
         .properties(title="Probability of Negative Return")
     )
-    return r_fig, p_fig
+    return p_fig
 
 
 def create_cum_ret_chart(r_cum: pl.DataFrame) -> alt.Chart:

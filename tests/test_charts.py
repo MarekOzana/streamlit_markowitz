@@ -57,8 +57,7 @@ def test_create_portf_weights_chart():
 
 
 def test_create_exp_ret_chart():
-    r_fig, p_fig = src.charts.create_exp_ret_chart(r_ann=0.05, vol_ann=0.08, n=12)
-    assert isinstance(r_fig, alt.Chart)
+    p_fig = src.charts.create_prob_of_neg_chart(r_ann=0.05, vol_ann=0.08, n=12)
     assert isinstance(p_fig, alt.Chart)
 
 
