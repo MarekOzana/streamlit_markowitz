@@ -16,7 +16,7 @@ def find_min_var_portfolio(
     Solve the following optimization problem
         min: w.T*COV*w
         subjto: w.T * r_ann >= r_min
-                w.T * w = 1
+                sum(w) = 1
                 0 <= w[i] <= w_max for every i
     Parameters
     ==========
