@@ -167,7 +167,17 @@ def create_fund_info_tab(db):
         fig = charts.create_cumul_ret_with_drawdown_chart(df)
         col1.altair_chart(fig, use_container_width=True)
 
-        # Rating and Ticker Exposures
+    # MOnthly Performance
+    m_tbl: pl.DataFrame = db.get_monthly_perf(name=name)
+    m_style = (
+        m_tbl.with_columns(pl.col("Year").cast(str))
+        .to_pandas()
+        .set_index("Year")
+        .style.format("{:0.2%}", na_rep="")
+    )
+    st.dataframe(m_style)
+
+    # Rating and Ticker Exposures
     df = db.get_fund_exposures(name=name)
     if len(df) > 0:
         fig = charts.create_exp_chart(df)

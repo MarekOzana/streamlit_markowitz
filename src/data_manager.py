@@ -19,6 +19,7 @@ from datetime import date
 import datetime
 import re
 from typing import Optional
+import calendar
 
 from filelock import FileLock
 import certifi
@@ -270,6 +271,52 @@ class DataManager:
             )
         )
         return r_cum
+
+    def get_monthly_perf(self, name: str) -> pl.DataFrame:
+        """
+        Retrieves the monthly performance as a DataFrame with years in the rows,
+        months in the columns, and Year-to-Date (YTD) returns in the last column.
+
+        Parameters:
+            name (str): The name of the asset for which to calculate performance.
+
+        Returns:
+            pl.DataFrame: A DataFrame with performance metrics organized by month and year.
+        """
+        # Get daily returns for the specified name
+        d_rets: pl.DataFrame = self.get_daily_rets(names=[name])
+
+        # Calculate monthly returns
+        m_rets: pl.DataFrame = (
+            d_rets.group_by([
+                pl.col("date").dt.year().alias("Year"),
+                pl.col("date").dt.month().alias("Month")
+            ])
+            .agg((pl.col(name).add(1).product() - 1).alias("ret"))
+            .sort(["Year", "Month"])
+        )
+
+        # Calculate Year-to-Date returns
+        y_rets: pl.DataFrame = (
+            m_rets.group_by("Year")
+            .agg((pl.col("ret").add(1).product() - 1).alias("YTD"))
+        )
+
+        # Pivot table to transform data for easier year/month viewing
+        m_tbl: pl.DataFrame = (
+            m_rets.pivot(values="ret", index="Year", columns="Month")
+            .sort("Year")
+            .select(["Year"] + [str(i) for i in range(1, 13)])
+        )
+
+        # Join the YTD data
+        m_tbl = m_tbl.join(y_rets, on="Year")
+
+        # Rename columns from month numbers to month abbreviations
+        month_map = {str(i): calendar.month_abbr[i] for i in range(1, 13)}
+        m_tbl = m_tbl.rename(month_map)
+
+        return m_tbl
 
     def get_fund_exposures(self, name: str) -> pl.DataFrame:
         """Get fund exposures

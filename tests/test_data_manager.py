@@ -252,12 +252,35 @@ def test_last_update(dm: DataManager):
     }
 
 
-def test_get_cumulative_rets(dm: DataManager):
+def test_get_cumulative_rets_and_dd(dm: DataManager):
     r_cum = dm.get_cumulative_rets_and_dd(name="SEB Hybrid")
     assert isinstance(r_cum, pl.DataFrame)
     assert r_cum.columns == ["date", "SEB Hybrid", "DrawDown"]
     assert r_cum.shape == (234, 3)
     assert round(r_cum.item(-1, "SEB Hybrid"), 3) == 0.125
+
+
+def test_get_monthly_perf(dm: DataManager):
+    m_tbl = dm.get_monthly_perf(name="SEB Hybrid")
+    assert m_tbl.shape == (2, 14)
+    assert m_tbl.with_columns(cs.by_dtype(pl.Float64).round(4).fill_null(0)).to_dict(
+        as_series=False
+    ) == {
+        "Year": [2023, 2024],
+        "Jan": [0.0, 0.0102],
+        "Feb": [0.0, 0.0021],
+        "Mar": [0.0019, 0.0127],
+        "Apr": [-0.0056, 0.0],
+        "May": [0.0075, 0.0],
+        "Jun": [0.0053, 0.0],
+        "Jul": [0.0245, 0.0],
+        "Aug": [-0.007, 0.0],
+        "Sep": [-0.0021, 0.0],
+        "Oct": [0.0015, 0.0],
+        "Nov": [0.0358, 0.0],
+        "Dec": [0.0323, 0.0],
+        "YTD": [0.097, 0.0252],
+    }
 
 
 def test_get_cumulative_rets_with_OPT(dm: DataManager):
