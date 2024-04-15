@@ -23,12 +23,26 @@ st.set_page_config(
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def get_params(db: DataManager) -> float:
+@st.cache_resource
+def get_db() -> DataManager:
+    logger.debug("Creating new DataManager")
+    db = DataManager()
+    return db
+
+
+@st.cache_data
+def calc_eff_frontier(exp_rets: np.array, cov: np.array) -> pl.DataFrame:
+    logger.debug("Calculating new Efficient frontier")
+    frnt: dict = opt.calc_eff_front(exp_rets, cov)
+    return pl.DataFrame(frnt)
+
+
+def get_params(db: DataManager) -> tuple:
     """get tickers  and set them to DataManger, get r_min
 
     Returns
     -------
-    r_min: float
+    (r_min, show_frnt): float, bool
     """
     # get r_min
     r_minimum, r_maximum = db.get_min_max_ret()
@@ -61,17 +75,20 @@ def get_params(db: DataManager) -> float:
         st.session_state["tickers"] = tickers
         db.set_ret_vol_corr(tickers)
 
+    show_frnt = st.toggle("Show Efficient Frontier")
+
     st.divider()
     with st.popover("How to Use the App"):
         st.markdown(pathlib.Path("data/usage.txt").read_text())
 
-    return r_min
+    return r_min, show_frnt
 
 
-def create_main_tab(db: DataManager, r_min: float) -> None:
+def create_main_tab(db: DataManager, r_min: float, show_frnt: bool) -> None:
     """Create main TAB with optimization charts and portfolio Weights"""
     # Optimize
-    w, r_opt, vol_opt = opt.find_min_var_portfolio(db.get_ret(), db.get_covar(), r_min)
+    cov = db.get_covar()
+    w, r_opt, vol_opt = opt.find_min_var_portfolio(db.get_ret(), cov, r_min)
 
     # Create Scatter chart and Portfolio Composition Chart
     g_data = pl.DataFrame(
@@ -82,7 +99,10 @@ def create_main_tab(db: DataManager, r_min: float) -> None:
             "w_opt": w.tolist() + [1],
         }
     )
-    f_sc = charts.create_scatter_chart(g_data)
+    # Create frontier
+    df_frnt = calc_eff_frontier(db.get_ret(), cov) if show_frnt else None
+    f_sc = charts.create_scatter_chart(g_data, df_frnt)
+
     f_w = charts.create_portf_weights_chart(g_data)
     title = f"Optimal Portfolio: r={r_opt:0.1%}, vol={vol_opt:0.1%}"
     col1, col2 = st.columns([1.5, 1])
@@ -186,23 +206,17 @@ def create_fund_info_tab(db):
         st.info(f"Exposure info NOT available for {name}")
 
 
-@st.cache_resource
-def get_db() -> DataManager:
-    db = DataManager()
-    return db
-
-
 def main() -> None:
     st.title("Markowitz Optimization")
     db = get_db()
 
     with st.sidebar:
         st.title("Parameters")
-        r_min = get_params(db)
+        r_min, show_frnt = get_params(db)
 
     tab_main, tab_data, tab_fund = st.tabs(["Optimal Portfolio", "Data", "Fund Info"])
     with tab_main:
-        create_main_tab(db, r_min)
+        create_main_tab(db, r_min, show_frnt)
 
     with tab_data:
         create_edit_assumptions_tab(db)

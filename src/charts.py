@@ -5,6 +5,7 @@ Charts for Markowitz Optimization Visualization
 .. date:: 2024-03
 """
 
+from typing import Optional
 import altair as alt
 import polars as pl
 import numpy as np
@@ -12,7 +13,9 @@ from scipy.stats import norm
 from datetime import date, timedelta
 
 
-def create_scatter_chart(g_data: pl.DataFrame) -> alt.LayerChart:
+def create_scatter_chart(
+    g_data: pl.DataFrame, df_frnt: Optional[pl.DataFrame] = None
+) -> alt.LayerChart:
     base = alt.Chart(g_data, title="Risk vs Return Profile").encode(
         x=alt.X("vols").axis(format="%").title("Volatility"),
         y=alt.Y("rets").axis(format="%").title("Expected Return"),
@@ -36,6 +39,16 @@ def create_scatter_chart(g_data: pl.DataFrame) -> alt.LayerChart:
         text=alt.Text("name")
     )
     fig = sc + text
+    if df_frnt is not None:
+        line = (
+            alt.Chart(df_frnt)
+            .mark_line(strokeDash=(1, 1), interpolate="cardinal", opacity=0.5)
+            .encode(
+                x=alt.X("vols").axis(format="%").title("Volatility"),
+                y=alt.Y("rets").axis(format="%").title("Expected Return"),
+            )
+        )
+        fig = line + fig
     return fig
 
 
@@ -60,7 +73,7 @@ def create_portf_weights_chart(g_data: pl.DataFrame):
         .scale(domain=[0, 1], scheme="purpleorange")
         .legend(None)
     )
-    text = base.mark_text(align="center", baseline="bottom").encode(
+    text = base.mark_text(align="left", baseline="middle", dx=3).encode(
         text=alt.Text("w_opt", format="0.0%")
     )
     fig = bars + text
@@ -90,7 +103,7 @@ def create_prob_of_neg_chart(
         start=today,
         end=today + timedelta(days=365 * n // 12),
         interval="1mo",
-        eager=True
+        eager=True,
     )
     # dates = pd.date_range(start=today, periods=n, freq=pd.offsets.BMonthEnd())
     t = np.array([(day - today).days / 364 for day in dates])

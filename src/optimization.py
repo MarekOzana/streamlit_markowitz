@@ -61,3 +61,27 @@ def find_min_var_portfolio(
     r_opt = np.dot(w, exp_rets)
     vol_opt = np.sqrt(calc_var(w, cov))
     return w, r_opt, vol_opt
+
+
+def calc_eff_front(exp_rets: np.array, cov: np.array) -> dict[str, list]:
+    """Calculate effective frontier
+
+    Iteratively find optimal portfoli for list of minimum returns
+
+    Parameters
+    ----------
+        exp_rets: annualized expected returns
+        cov: covariance matrix
+
+    Returns
+    -------
+        frnt: dict("ret":list(float), "vol":list(float))
+        Dictionary with points on the efficient frontier
+    """
+    N_STEPS: int = 9
+    frnt: dict[str, list] = {"rets": list(), "vols": list()}
+    for r_min in np.linspace(exp_rets.min(), exp_rets.max(), N_STEPS):
+        _, ret, vol = find_min_var_portfolio(exp_rets=exp_rets, cov=cov, r_min=r_min)
+        frnt["vols"].append(vol)
+        frnt["rets"].append(ret)
+    return frnt
