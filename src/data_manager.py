@@ -534,7 +534,7 @@ class Updater:
                 # rating = ix -> moodys -> sp -> fitch
                 pl.col("ix_rtg")
                 .fill_null(pl.col("rtg_moody"))
-                .map_elements(lambda x: self.MOODY_TO_SP.get(x))
+                .map_elements(lambda x: self.MOODY_TO_SP.get(x), return_dtype=pl.String)
                 .fill_null(pl.col("rtg_sp"))
                 .fill_null(pl.col("rtg_fitch"))
                 .cast(self.RATING_TYPE)
@@ -542,7 +542,7 @@ class Updater:
             )
             .with_columns(
                 pl.col("rating")
-                .map_elements(lambda x: self.RATING_TO_MRATING.get(x))
+                .map_elements(lambda x: self.RATING_TO_MRATING.get(x), return_dtype=pl.String)
                 .cast(self.MRATING_TYPE)
                 .alias("m_rating")
             )
