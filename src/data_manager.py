@@ -469,7 +469,6 @@ class Updater:
         self.as_of: date = self._extract_report_date(f_name)
         logger.info(f"Parsing {f_name} as of {self.as_of:%F}")
         self.tbl: pl.LazyFrame = self._import_fund_info(f_name)
-        # TODO: insert key figures and date
 
     def _extract_report_date(self, f_name: Path) -> Optional[date]:
         """
@@ -542,7 +541,9 @@ class Updater:
             )
             .with_columns(
                 pl.col("rating")
-                .map_elements(lambda x: self.RATING_TO_MRATING.get(x), return_dtype=pl.String)
+                .map_elements(
+                    lambda x: self.RATING_TO_MRATING.get(x), return_dtype=pl.String
+                )
                 .cast(self.MRATING_TYPE)
                 .alias("m_rating")
             )
@@ -601,6 +602,71 @@ class Updater:
         )
         logger.info(f"Saving {df_kf.shape} key figures to {o_name}")
         df_kf.write_parquet(o_name)
+
+
+class MicroFinUpdater:
+    """
+    Generate synthetic Micro Finance Fund time series from quarterly data and SEK=X
+    """
+
+    def __init__(self):
+        dm = DataManager()
+        rets = pl.read_csv(
+            "data/MicroRets.csv", dtypes={"date": pl.Date}, columns=["date", "MicroSEK"]
+        )
+        # Get currency
+        session = dm._setup_session()
+        pd_usd = (
+            yf.Ticker(ticker="SEK=X", session=session)
+            .history(start=rets["date"][0], interval="1d")
+            .reset_index()
+        )
+        ccy = pl.DataFrame(pd_usd).select(
+            pl.col("Date").cast(pl.Date).alias("date"),
+            pl.col("Close").cast(pl.Float64).alias("usdsek"),
+        )
+        # Merge table
+        tbl = (
+            rets.join(ccy, on="date", how="outer")
+            .with_columns(pl.col("date").fill_null(pl.col("date_right")))
+            .sort(pl.col("date"))
+            .with_columns(pl.col("usdsek").fill_null(strategy="forward"))
+            .drop(["date_right"])
+        )
+        # Calculate factor
+        factor = (
+            tbl.drop_nulls(subset="MicroSEK")
+            .with_columns(pl.col("usdsek").pct_change().alias("RQ_usdsek"))
+            .select(
+                pl.col("date").shift(+1).alias("prev_dt"),
+                pl.col("date"),
+                (pl.col("MicroSEK") / pl.col("RQ_usdsek")).alias("factor"),
+            )
+            .drop_nulls()
+        )
+        n_list = []
+        for row in factor.rows():
+            n = tbl.filter(
+                (pl.col("date") > row[0]) & (pl.col("date") <= row[1])
+            ).shape[0]
+            n_list.append(n)
+        factor = factor.with_columns(pl.Series(n_list).alias("n")).with_columns(
+            (pl.col("factor") / pl.col("n")).alias("n_fact")
+        )
+
+        # Create proxy
+        tbl = (
+            tbl.join(factor, on="date", how="left")
+            .with_columns(
+                pl.col("usdsek").pct_change().alias("r_usdsek"),
+                pl.col("n_fact").fill_null(strategy="backward").fill_null(1),
+            )
+            .drop_nulls(subset=["r_usdsek", "n_fact"])
+            .with_columns(
+                pl.col("r_usdsek").mul(pl.col("n_fact")).alias("r_proxy")
+            )
+            .with_columns(pl.col("r_proxy").add(1).cum_prod().add(-1).alias("proxy"))
+        )
 
 
 def main():

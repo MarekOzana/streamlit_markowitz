@@ -63,7 +63,7 @@ def get_params(db: DataManager) -> tuple:
     tickers = st.multiselect(
         label="Tickers",
         options=db.names(),
-        default=db.names()[:-1],
+        default=db.names()[:-2],
         help="Select Names",
     )
     if not tickers:
