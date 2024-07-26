@@ -216,7 +216,7 @@ class DataManager:
                 right_on="id",
             )
             .filter(pl.col("name").is_in(names))
-            .pivot(index="date", columns="name", values="price")
+            .pivot(index="date", on="name", values="price")
             .sort("date")
             .fill_null(strategy="forward")
         )
@@ -604,83 +604,130 @@ class Updater:
         df_kf.write_parquet(o_name)
 
 
-class MicroFinUpdater:
+def generate_synthetic_MicroFin_series():
     """
     Generate synthetic Micro Finance Fund time series from quarterly data and SEK=X
     """
+    rets = pl.read_csv(
+        "data/MicroRets.csv",
+        schema_overrides={"date": pl.Date},
+        columns=["date", "MicroSEK"],
+    )
+    # Get currency
+    logger.debug("Downloading USDSEK series from Yahoo")
+    dm = DataManager()
+    session = dm._setup_session()
+    pd_usd = (
+        yf.Ticker(ticker="SEK=X", session=session)
+        .history(start=rets["date"][0], interval="1d")
+        .reset_index()
+    )
+    ccy = pl.DataFrame(pd_usd).select(
+        pl.col("Date").cast(pl.Date).alias("date"),
+        pl.col("Close").cast(pl.Float64).alias("usdsek"),
+    )
 
-    def __init__(self):
-        dm = DataManager()
-        rets = pl.read_csv(
-            "data/MicroRets.csv", dtypes={"date": pl.Date}, columns=["date", "MicroSEK"]
+    # create daily merged table
+    tbl = (
+        rets.join(ccy, on="date", how="full")
+        .with_columns(pl.col("date").fill_null(pl.col("date_right")))
+        .sort(pl.col("date"))
+        .with_columns(pl.col("usdsek").fill_null(strategy="forward"))
+        .with_columns(
+            pl.col("usdsek").pct_change().add(1).alias("r+1"),
         )
-        # Get currency
-        session = dm._setup_session()
-        pd_usd = (
-            yf.Ticker(ticker="SEK=X", session=session)
-            .history(start=rets["date"][0], interval="1d")
-            .reset_index()
-        )
-        ccy = pl.DataFrame(pd_usd).select(
-            pl.col("Date").cast(pl.Date).alias("date"),
-            pl.col("Close").cast(pl.Float64).alias("usdsek"),
-        )
-        # Merge table
-        tbl = (
-            rets.join(ccy, on="date", how="outer")
-            .with_columns(pl.col("date").fill_null(pl.col("date_right")))
-            .sort(pl.col("date"))
-            .with_columns(pl.col("usdsek").fill_null(strategy="forward"))
-            .drop(["date_right"])
-        )
-        # Calculate factor
-        factor = (
-            tbl.drop_nulls(subset="MicroSEK")
-            .with_columns(pl.col("usdsek").pct_change().alias("RQ_usdsek"))
-            .select(
-                pl.col("date").shift(+1).alias("prev_dt"),
-                pl.col("date"),
-                (pl.col("MicroSEK") / pl.col("RQ_usdsek")).alias("factor"),
-            )
-            .drop_nulls()
-        )
-        n_list = []
-        for row in factor.rows():
-            n = tbl.filter(
-                (pl.col("date") > row[0]) & (pl.col("date") <= row[1])
-            ).shape[0]
-            n_list.append(n)
-        factor = factor.with_columns(pl.Series(n_list).alias("n")).with_columns(
-            (pl.col("factor") / pl.col("n")).alias("n_fact")
-        )
+        .drop(["date_right"])
+    )
 
-        # Create proxy
-        tbl = (
-            tbl.join(factor, on="date", how="left")
-            .with_columns(
-                pl.col("usdsek").pct_change().alias("r_usdsek"),
-                pl.col("n_fact").fill_null(strategy="backward").fill_null(1),
-            )
-            .drop_nulls(subset=["r_usdsek", "n_fact"])
-            .with_columns(
-                pl.col("r_usdsek").mul(pl.col("n_fact")).alias("r_proxy")
-            )
-            .with_columns(pl.col("r_proxy").add(1).cum_prod().add(-1).alias("proxy"))
+    # Calculate quarterly 1+R (fund), 1+r (crcny), 1+d (extra spread), (1+d)^(1/n) = fact
+    tbl_q = (
+        tbl.drop_nulls(subset="MicroSEK")
+        .select(
+            pl.col("date").shift(+1).alias("prev_dt"),
+            pl.col("date"),
+            pl.col("MicroSEK").add(1).alias("R+1"),
+            pl.col("usdsek").pct_change().add(1).alias("rCCY+1"),
         )
+        .with_columns((pl.col("R+1") / pl.col("rCCY+1")).alias("d+1"))
+        .drop_nulls(subset="prev_dt")
+        .with_columns(
+            pl.struct(["prev_dt", "date"])
+            .map_elements(
+                lambda x: np.busday_count(x["prev_dt"], x["date"]),
+                return_dtype=pl.Int64,
+            )
+            .alias("n")
+        )
+        .with_columns((pl.col("d+1") ** (1 / pl.col("n"))).alias("fact"))
+    )
+
+    # Create proxy: synthetic wealth series: 1+rS = (1+r) * (1+d)^(1/n)
+    tbl = (
+        tbl.join(tbl_q, on="date", how="left")
+        .with_columns(
+            pl.col("usdsek").pct_change().add(1).alias("r+1"),
+            pl.col("fact")
+            .fill_null(strategy="backward")
+            .fill_null(strategy="mean"),
+        )
+        .with_columns(pl.col("r+1").mul(pl.col("fact")).alias("rS+1"))
+    )
+    # Scale to last point of USDSEK
+    scale = tbl["usdsek"].item(-1) / tbl["rS+1"].product()
+    tbl = tbl.with_columns((pl.col("rS+1").cum_prod() * scale).alias("PROXY"))
+
+    # Update price table
+    FUND_ID = 8  # Micro
+    new_prices = (
+        pl.DataFrame(
+            {"fund_id": FUND_ID, "date": tbl["date"], "price": tbl["PROXY"]}
+        )
+        .with_columns(dm.PRICE_COLS)
+        .drop_nulls()
+    )
+    dm.t_price = pl.concat([dm.t_price.filter(pl.col("fund_id") != FUND_ID), new_prices]).unique(
+        subset=["fund_id", "date"], keep="last"
+    ).sort(by=["fund_id", "date"])
+
+    logger.warning("Updating t_price table with MICRO")
+    dm.t_price.write_parquet(dm.price_tbl)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Update Exposures and KeyFigures")
-    parser.add_argument("-f", "--file", required=True, help="M_Funds.csv file")
+    parser = argparse.ArgumentParser(description="Update Fund Exposures or Micro Time Series")
+    # Add an optional logging level argument
+    parser.add_argument(
+        "--log",
+        "-l",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set the logging level",
+    )
 
+    subparsers = parser.add_subparsers(dest='command', required=True, help='micro/funds')
+    
+    # Subparser for the "funds" command
+    parser_funds = subparsers.add_parser('funds', help='Parse M_FUnds.csv and update exposures')
+    parser_funds.add_argument('--file', '-f', required=True, help="M_Funds.csv file")
+    
+    # Subparser for the "micro" command
+    subparsers.add_parser('micro', help='Parse data/MicroRets.csv and create synthetic time series')
+    
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO)
-    logger.setLevel(logging.INFO)
-    u = Updater(args.file)
-    u.save_t_exp_table(o_name=Path("data/t_exp.parquet"))
-    u.save_t_keyfigures_table(o_name=Path("data/t_keyfigures.parquet"))
-    logger.info("DONE")
+    logging.basicConfig(level=args.log)
+    logger.setLevel(args.log)
+
+    if args.command == "funds":
+        logger.info("Updating Fund exposures")
+        u = Updater(args.file)
+        u.save_t_exp_table(o_name=Path("data/t_exp.parquet"))
+        u.save_t_keyfigures_table(o_name=Path("data/t_keyfigures.parquet"))
+        logger.info("DONE")
+    elif args.command == "micro":
+        logger.info("Creating new Micro FInance NAV proxy time series")
+        generate_synthetic_MicroFin_series()
 
 
 if __name__ == "__main__":

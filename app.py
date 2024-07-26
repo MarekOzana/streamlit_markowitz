@@ -51,8 +51,8 @@ def get_params(db: DataManager) -> tuple:
         r_min = (
             st.slider(
                 label="Required Return",
-                min_value=r_minimum * 100,
-                max_value=r_maximum * 100,
+                min_value=min(4.0, r_minimum * 100),
+                max_value=max(r_maximum * 100, 10.0),
                 value=(r_minimum + r_maximum) / 2.0 * 100,
                 format="%.1f%%",
                 help="Constraint on required minimum return",

@@ -436,7 +436,7 @@ class TestCLI:
     def test_main(self, m_updater, caplog: pytest.LogCaptureFixture):
         m_instance = MagicMock()
         m_updater.return_value = m_instance
-        test_args = ["data_manager.py", "-f", "M_Funds.csv"]
+        test_args = ["data_manager.py", "funds", "-f", "M_Funds.csv"]
         with patch("sys.argv", test_args):
             src.data_manager.main()
         # Check if Updater was called correctly
