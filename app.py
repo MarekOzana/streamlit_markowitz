@@ -26,7 +26,12 @@ logger: logging.Logger = logging.getLogger(__name__)
 @st.cache_resource
 def get_db() -> DataManager:
     logger.debug("Creating new DataManager")
-    db = DataManager()
+    if "db" not in st.session_state:
+        db = DataManager()
+        st.session_state["db"] = db
+    else:
+        logger.warning("DataManager already exists!")
+        db = st.session_state["db"]
     return db
 
 
@@ -72,6 +77,7 @@ def get_params(db: DataManager) -> tuple:
 
     # Set tickers
     if ("tickers" not in st.session_state) or (tickers != st.session_state["tickers"]):
+        logger.debug("New tickers: %s" % ",".join(tickers))
         st.session_state["tickers"] = tickers
         db.set_ret_vol_corr(tickers)
 
@@ -160,7 +166,8 @@ def create_edit_assumptions_tab(db: DataManager) -> None:
             },
         ).div(100)
 
-        if st.form_submit_button("Update Return / Vol / Correlations"):
+        submitted =  st.form_submit_button("Update Return / Vol / Correlations")
+        if submitted:
             st.info("Updateing values")
             db.ret_vol = pl.DataFrame(ret_vol.reset_index()).with_columns(
                 cs.by_dtype(pl.Float64).mul(0.01)
