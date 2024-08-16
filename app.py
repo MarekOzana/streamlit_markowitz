@@ -161,7 +161,7 @@ def create_edit_assumptions_tab(db: DataManager) -> None:
         ).div(100)
 
         if st.form_submit_button("Update Return / Vol / Correlations"):
-            st.info("Updateding values")
+            st.info("Updateing values")
             db.ret_vol = pl.DataFrame(ret_vol.reset_index()).with_columns(
                 cs.by_dtype(pl.Float64).mul(0.01)
             )
