@@ -5,12 +5,23 @@ Utilities to get data from Yahoo for quarterly optimization
 .. date:: 2024-08
 """
 
-import yfinance as yf
+import logging
+
 import polars as pl
+import yfinance as yf
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def update_quarterly_data():
-    """Update quarterly retuns for set of tickers"""
+    """Update quarterly retuns for set of tickers
+    Read data/MicroRets.csv for Micro FInance returns
+    Read Major assets from Yahoo
+
+    Create files
+        data/micfin_q_rets.csv ... time series with quarterly returns
+        data/micfin_exp_rets.csv ... expected annual returns
+    """
     # 1. Get data from Yahoo
     tick2name = {
         "^GSPC": "S&P500",
@@ -41,8 +52,24 @@ def update_quarterly_data():
         "data/MicroRets.csv",
         schema_overrides={"date": pl.Date},
     )
-    rets = rets1.join(rets2, on="date", how='left')
-    
-    f_name = "data/quarterly_rets.csv"
-    rets.write_csv("data/quarterly_rets.csv")
-    print(f"Saved to {f_name}")
+    rets = rets1.join(rets2, on="date", how="left")
+
+    # Save time series
+    f_name = "data/micfin_q_rets.csv"
+    rets.write_csv(f_name)
+    logger.info(f"Saved to {f_name}")
+
+    # Save expected returns
+    exp_rets = rets.drop("date").mean() * 4
+    exp_rets = exp_rets.transpose(
+        include_header=True, header_name="ticker", column_names=["exp_ret"]
+    )
+    f_name = "data/micfin_exp_rets.csv"
+    exp_rets.write_csv(f_name)
+    logger.info(f"Saved to {f_name}")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    logger.setLevel(logging.INFO)
+    update_quarterly_data()
