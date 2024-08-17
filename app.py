@@ -17,7 +17,9 @@ import src.optimization as opt
 from src.data_manager import DataManager
 
 st.set_page_config(
-    page_title="Markowitz Optimizer", layout="wide", page_icon="data/icon.png"
+    page_title="Markowitz Optimizer",
+    layout="wide",
+    page_icon="data/icon.png",
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -84,6 +86,8 @@ def get_params(db: DataManager) -> tuple:
     show_frnt = st.toggle("Show Efficient Frontier")
 
     st.divider()
+    st.page_link("pages/Micro_Finance_Analyzer.py", label="Micro Finance Analyzer", icon="💸")
+
     with st.popover("How to Use the App"):
         st.markdown(pathlib.Path("data/usage.txt").read_text())
 
@@ -166,7 +170,7 @@ def create_edit_assumptions_tab(db: DataManager) -> None:
             },
         ).div(100)
 
-        submitted =  st.form_submit_button("Update Return / Vol / Correlations")
+        submitted = st.form_submit_button("Update Return / Vol / Correlations")
         if submitted:
             st.info("Updateing values")
             db.ret_vol = pl.DataFrame(ret_vol.reset_index()).with_columns(

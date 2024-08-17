@@ -1,5 +1,5 @@
 """
-Utilities to get data from Yahoo for quarterly optimization
+Utilities to get Yahoo data for quarterly Micro Finance optimization
 
 .. author:: Marek Ozana
 .. date:: 2024-08

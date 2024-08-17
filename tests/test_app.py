@@ -6,6 +6,7 @@ Unit tests on the main streamlit app
 """
 
 from streamlit.testing.v1 import AppTest
+import logging
 
 
 def test_app():
@@ -49,3 +50,21 @@ def test_app_remove_tickers():
     assert not at.exception, "The app should not throw removing ticker"
     assert "**Expected Return in 1y** = 7.0%" in at.markdown[0].value
     assert "**Expected volatility** = 2.7%" in at.markdown[0].value
+
+
+def test_MicroFinanceAnalyzer_smoke_test(caplog):
+    at = AppTest.from_file("pages/Micro_Finance_Analyzer.py", default_timeout=30)
+
+    with caplog.at_level(logging.DEBUG):
+        at.run()
+    assert not at.exception
+    assert "Reading in data and calculating params" in caplog.text
+    assert "Micro Finance Analyzer" in at.title[0].value
+
+def test_MicroFinanceAnalyzer_page_switch():
+    at = AppTest.from_file("app.py", default_timeout=30)
+    at.run()
+    at.switch_page(page_path="pages/Micro_Finance_Analyzer.py")
+    at.run()
+    assert not at.exception
+    assert "Micro Finance Analyzer" in at.title[0].value

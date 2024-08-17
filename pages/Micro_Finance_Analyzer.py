@@ -14,6 +14,8 @@ import pandas as pd
 # # Add the src directory to the sys.path
 # sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "src")))
 # import optimization as opt
+import src.optimization as opt
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
