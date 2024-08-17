@@ -261,7 +261,7 @@ class DataManager:
                 .fill_null(0)
             )
             .with_columns(cs.by_dtype(pl.Float64).add(1).cum_prod().sub(1))
-            .melt(id_vars="date", variable_name="name", value_name="return")
+            .unpivot(index="date", variable_name="name", value_name="return")
             # set start point to 0%
             .with_columns(
                 pl.when(pl.col("date") == pl.col("date").min())
@@ -305,7 +305,7 @@ class DataManager:
 
         # Pivot table to transform data for easier year/month viewing
         m_tbl: pl.DataFrame = (
-            m_rets.pivot(values="ret", index="Year", columns="Month")
+            m_rets.pivot(on="Month", index="Year", values="ret")
             .sort("Year")
             .select(["Year"] + [str(i) for i in range(1, 13)])
         )
@@ -510,7 +510,7 @@ class Updater:
                 f_name,
                 has_header=True,
                 skip_rows=7,
-                dtypes={"Next Call Date": pl.Date},
+                schema_overrides={"Next Call Date": pl.Date},
                 null_values=[""],
                 new_columns=[
                     "id",
@@ -595,7 +595,7 @@ class Updater:
             self.tbl.filter(pl.col("ticker").is_null())
             .select(["portf", "ytc", "ytw", "oas", "zspread"])
             .with_columns(pl.lit(self.as_of).alias("date"))
-            .melt(id_vars=["date", "portf"], variable_name="key")
+            .unpivot(index=["date", "portf"], variable_name="key")
             .with_columns(pl.col("value").cast(pl.Float64))
             .sort(by=["date", "portf", "key"])
             .collect()
