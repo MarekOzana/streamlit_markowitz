@@ -192,6 +192,22 @@ def main() -> None:
     fig = create_cumul_per_chart(name)
     st.altair_chart(fig, use_container_width=True)
 
+    # Create performance table
+    tbl = (
+        st.session_state["orig_rets"][[name]]
+        .assign(
+            year=lambda x: x.index.year,
+            quarter=lambda x: x.index.month.map({3: "Q1", 6: "Q2", 9: "Q3", 12: "Q4"}),
+        )
+        .pivot(index="year", columns="quarter", values=name)
+        .assign(YTD=lambda x: x.add(1).prod(axis=1).sub(1))
+        .sort_index(ascending=False)
+    )
+    tbl.index = tbl.index.astype(str)
+
+    st.dataframe(tbl.style.format("{:0.2%}", na_rep=""))
+
+    # add disclaimer
     st.divider()
     st.caption(Path("data/disclaimer.txt").read_text())
 
