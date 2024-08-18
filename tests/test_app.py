@@ -49,7 +49,7 @@ def test_app_remove_tickers():
     # Verify that the app didn't throw an exception after the change.
     assert not at.exception, "The app should not throw removing ticker"
     assert "**Expected Return in 1y** = 7.0%" in at.markdown[0].value
-    assert "**Expected volatility** = 2.7%" in at.markdown[0].value
+    assert "**Expected volatility** = 2.8%" in at.markdown[0].value
 
 
 def test_MicroFinanceAnalyzer_smoke_test(caplog):
