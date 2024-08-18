@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import streamlit as st
-from scipy.stats import norm
 
 import src.charts as charts
 import src.optimization as opt
+import altair as alt
 
 st.set_page_config(
     page_title="SEB Micro Finance Analyser",
@@ -51,7 +51,7 @@ def get_user_input() -> None:
         r_min = (
             st.slider(
                 "Min Required Return",
-                min_value=0.1,
+                min_value=4.0,
                 max_value=10.0,
                 step=0.1,
                 value=7.0,
@@ -66,7 +66,14 @@ def get_user_input() -> None:
         tickers = st.multiselect(
             label="Tickers",
             options=all_tickers,
-            default=all_tickers[:-1],
+            default=[
+                "MicroSEK",
+                "AT1",
+                "EStoxx50",
+                "Euro Bills",
+                "Euro Corp",
+                "Euro High Yield",
+            ],
             help="Select Tickers for the optimization",
         )
         st.session_state["tickers"] = tickers
@@ -83,7 +90,11 @@ def get_user_input() -> None:
             )
             st.session_state["exp_rets"] = exp_rets.div(100)
 
+        start_dt = st.session_state["orig_rets"].index[0]
         with st.popover("Volatilities"):
+            st.markdown(f"""
+            Annualized Volatility\n
+            Based on quarterly returns since {start_dt:%b%Y}""")
             vols = st.data_editor(
                 st.session_state["orig_vols"] * 100,
                 use_container_width=False,
@@ -96,6 +107,7 @@ def get_user_input() -> None:
             st.session_state["vols"] = vols.div(100)
 
         with st.popover("Correlations"):
+            st.markdown(f"Based on quarterly returns since {start_dt:%b%Y}")
             corr = st.data_editor(
                 st.session_state["orig_corr"] * 100,
                 use_container_width=True,
@@ -109,13 +121,8 @@ def get_user_input() -> None:
             st.session_state["corr"] = corr.div(100)
 
 
-def main() -> None:
-    st.title("Micro Finance Analyzer")
-    load_data()  # Just once
-
-    get_user_input()
-
-    # get covar and calculate optimal portfolio
+def create_opt_portf_charts():
+    """Perform optimization and create scatter and portfolio charts"""
     tickers = st.session_state["tickers"]
     vols = st.session_state["vols"].loc[tickers]
     corr = st.session_state["corr"].loc[tickers, tickers]
@@ -124,7 +131,7 @@ def main() -> None:
     exp_rets = st.session_state["exp_rets"].loc[tickers]
     r_min = st.session_state["r_min"]
     w, r_opt, vol_opt = opt.find_min_var_portfolio(exp_rets, cov, r_min)
-    
+
     # Create Scatter chart and Portfolio Composition Chart
     g_data = pl.DataFrame(
         {
@@ -140,15 +147,50 @@ def main() -> None:
     col1, col2 = st.columns([1.5, 1])
     col1.altair_chart(f_sc, use_container_width=True)
     col2.altair_chart(f_w.properties(title=title, height=350), use_container_width=True)
-    st.markdown(
-        f"""
-        ### Optimal Portfolio Statistics
-        * **Expected Return in 1y** = {r_opt:0.1%}
-        * **Expected volatility** = {vol_opt:0.1%}
-        * 95%-prob Lowest Expected Return in 1y = {(r_opt - norm.ppf(0.95)*vol_opt):0.1%}
-        * 99%-prob Lowest Expected Return in 1y = {(r_opt - norm.ppf(0.99)*vol_opt):0.1%}
-        """
+
+
+@st.cache_data
+def create_cumul_per_chart(name: str) -> alt.LayerChart:
+    """Calculate cumulative performance and draw downs
+    and create cumulative performance chart"""
+    df: pl.DataFrame = pl.DataFrame(st.session_state["orig_rets"][name].reset_index())
+    df = (
+        df.fill_null(0)
+        .with_columns(pl.col(name).add(1).cum_prod().sub(1))
+        .with_columns(pl.col(name).add(1).cum_max().alias("prev_peaks"))
+        .with_columns(
+            pl.col(name)
+            .add(1)
+            .sub(pl.col("prev_peaks"))
+            .truediv(pl.col("prev_peaks"))
+            .alias("DrawDown")
+        )
+        .select(["date", name, "DrawDown"])
     )
+    fig = charts.create_cumul_ret_with_drawdown_chart(df).properties(
+        title=f"{name} Cumulative Performance"
+    )
+    return fig
+
+
+def main() -> None:
+    st.title("SEB Micro Finance Analyzer")
+    load_data()  # Just once
+
+    get_user_input()
+
+    create_opt_portf_charts()
+
+    st.divider()
+    # Create chart with draw-downs
+    name = st.radio(
+        "Select ShareClass:",
+        options=["MicroSEK", "MicroEUR"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    fig = create_cumul_per_chart(name)
+    st.altair_chart(fig, use_container_width=True)
 
     st.divider()
     st.caption(Path("data/disclaimer.txt").read_text())
