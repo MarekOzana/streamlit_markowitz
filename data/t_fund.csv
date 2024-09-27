@@ -1,9 +1,11 @@
 id,name,long_name,yahoo,portf,exp_ret
-1,SEB Hybrid,SEB Hybrid Capital Bond Fund R-EUR,0P0001QM99.F,HYBRID,0.078
-2,T-Bills,Lazard Euro Short Term Money Market,0P0000XBX1.F,,0.04
-3,Corps,Invesco Euro Corporate Bond A EUR,0P00005Z2A.F,,0.044
-4,High Yield,SEB Global High Yield EUR,0P0001CDNC.F,HYLDR HOLD,0.064
-5,Equity,SEB Europe Exposure Fund IC EUR,0P000157DY.F,,0.10
-6,Climate Focus,SEB Climate Focus High Yield Fund,0P0000ZW1Z.F,EURHYL HOLD,0.068
-7,Asset Selection,SEB Asset Selection UC EUR,0P0001CBFM.F,,0.08
-8,Micro Fins,Micro Fins PROXY,SEK=X,,0.085
+1,SEB Hybrid,SEB Hybrid Capital Bond Fund R-EUR,0P0001QM99.F,HYBRID,0.068
+2,T-Bills,Lazard Euro Short Term Money Market,0P0000XBX1.F,,0.03
+3,Corps,Invesco Euro Corporate Bond A EUR,0P00005Z2A.F,,0.034
+4,High Yield,SEB Global High Yield EUR,0P0001CDNC.F,HYLDR HOLD,0.054
+5,EU Equity,SEB Europe Exposure Fund IC EUR,0P000157DY.F,,0.075
+6,Climate Focus,SEB Climate Focus High Yield Fund,0P0000ZW1Z.F,EURHYL HOLD,0.058
+7,Asset Selection,SEB Asset Selection UC EUR,0P0001CBFM.F,,0.07
+8,SEB Hybrid A-SEK,SEB Hybrid Capital Bond Fund A-SEK,0P0001QM8S.ST,,0.06
+9,Obligationsfond SEK,SEB Obligationsfond SEK,0P00012UG9.ST,,0.03
+10,OMXSPI SEK,OMX Stockholm SEK,^OMXSPI,,0.08

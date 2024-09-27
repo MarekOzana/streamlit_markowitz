@@ -58,9 +58,10 @@ def get_params(db: DataManager) -> tuple:
         r_min = (
             st.slider(
                 label="Required Return",
-                min_value=min(4.0, r_minimum * 100),
-                max_value=max(r_maximum * 100, 10.0),
-                value=(r_minimum + r_maximum) / 2.0 * 100,
+                min_value=2.0,
+                max_value=8.0,
+                value=6.0,
+                step=0.1,
                 format="%.1f%%",
                 help="Constraint on required minimum return",
             )
@@ -70,7 +71,7 @@ def get_params(db: DataManager) -> tuple:
     tickers = st.multiselect(
         label="Tickers",
         options=db.names(),
-        default=db.names()[:-2],
+        default=db.names()[:-4],
         help="Select Names",
     )
     if not tickers:
