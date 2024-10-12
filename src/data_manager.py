@@ -666,9 +666,7 @@ def generate_synthetic_MicroFin_series():
         tbl.join(tbl_q, on="date", how="left")
         .with_columns(
             pl.col("usdsek").pct_change().add(1).alias("r+1"),
-            pl.col("fact")
-            .fill_null(strategy="backward")
-            .fill_null(strategy="mean"),
+            pl.col("fact").fill_null(strategy="backward").fill_null(strategy="mean"),
         )
         .with_columns(pl.col("r+1").mul(pl.col("fact")).alias("rS+1"))
     )
@@ -679,22 +677,24 @@ def generate_synthetic_MicroFin_series():
     # Update price table
     FUND_ID = 8  # Micro
     new_prices = (
-        pl.DataFrame(
-            {"fund_id": FUND_ID, "date": tbl["date"], "price": tbl["PROXY"]}
-        )
+        pl.DataFrame({"fund_id": FUND_ID, "date": tbl["date"], "price": tbl["PROXY"]})
         .with_columns(dm.PRICE_COLS)
         .drop_nulls()
     )
-    dm.t_price = pl.concat([dm.t_price.filter(pl.col("fund_id") != FUND_ID), new_prices]).unique(
-        subset=["fund_id", "date"], keep="last"
-    ).sort(by=["fund_id", "date"])
+    dm.t_price = (
+        pl.concat([dm.t_price.filter(pl.col("fund_id") != FUND_ID), new_prices])
+        .unique(subset=["fund_id", "date"], keep="last")
+        .sort(by=["fund_id", "date"])
+    )
 
     logger.warning("Updating t_price table with MICRO")
     dm.t_price.write_parquet(dm.price_tbl)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Update Fund Exposures or Micro Time Series")
+    parser = argparse.ArgumentParser(
+        description="Update Fund Exposures or Micro Time Series"
+    )
     # Add an optional logging level argument
     parser.add_argument(
         "--log",
@@ -705,15 +705,21 @@ def main():
         help="Set the logging level",
     )
 
-    subparsers = parser.add_subparsers(dest='command', required=True, help='micro/funds')
-    
+    subparsers = parser.add_subparsers(
+        dest="command", required=True, help="micro/funds"
+    )
+
     # Subparser for the "funds" command
-    parser_funds = subparsers.add_parser('funds', help='Parse M_FUnds.csv and update exposures')
-    parser_funds.add_argument('--file', '-f', required=True, help="M_Funds.csv file")
-    
+    parser_funds = subparsers.add_parser(
+        "funds", help="Parse M_FUnds.csv and update exposures"
+    )
+    parser_funds.add_argument("--file", "-f", required=True, help="M_Funds.csv file")
+
     # Subparser for the "micro" command
-    subparsers.add_parser('micro', help='Parse data/MicroRets.csv and create synthetic time series')
-    
+    subparsers.add_parser(
+        "micro", help="Parse data/MicroRets.csv and create synthetic time series"
+    )
+
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log)

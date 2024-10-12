@@ -22,3 +22,15 @@ def tests(session):
 
     # Run pytest on the 'tests' directory
     session.run("pytest", "tests")
+
+@nox.session(python="3.12")
+def ruff(session):
+    """Run ruff & black code formatter."""
+    # Install black, ruff
+    session.install("black", "ruff")
+
+    # Run ruff linter
+    session.run("ruff", "check", "src", "pages", "app.py")
+    # Run black linter
+    session.run("black", "--check", "src", "pages", "app.py")
+

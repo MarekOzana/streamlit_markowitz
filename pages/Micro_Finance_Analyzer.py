@@ -92,9 +92,11 @@ def get_user_input() -> None:
 
         start_dt = st.session_state["orig_rets"].index[0]
         with st.popover("Volatilities"):
-            st.markdown(f"""
+            st.markdown(
+                f"""
             Annualized Volatility\n
-            Based on quarterly returns since {start_dt:%b%Y}""")
+            Based on quarterly returns since {start_dt:%b%Y}"""
+            )
             vols = st.data_editor(
                 st.session_state["orig_vols"] * 100,
                 use_container_width=False,
