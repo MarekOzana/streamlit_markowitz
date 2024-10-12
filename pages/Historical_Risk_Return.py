@@ -191,21 +191,25 @@ def calc_portfolio_metrics(r_m: pl.DataFrame, tickers: list[str]) -> pl.DataFram
     return portfolios
 
 
-def chart_risk_return(portfolios: pl.DataFrame, tickers: list[str]) -> alt.LayerChart:
+def chart_risk_return(
+    portfolios: pl.DataFrame, tickers: list[str], title: str
+) -> alt.LayerChart:
     """Create a risk-return chart for given portfolio metrics.
 
-    We assume that w0 = GOVIES, w1=HY /AT, w2=IG
+    We assume that w0 = GOVIES, w1=HY /AT1, w2=IG
     """
     assert len(tickers) == 3, "Only 3 tickers supported"
 
     g_data = portfolios.with_columns((pl.col("r") / pl.col("vol")).alias("r2vol"))
 
-    title = alt.Title(
-        text="Realized Risk / Return",
-        subtitle=f"{tickers[0]} / {tickers[1]} / {tickers[2]}",
-    )
     base = (
-        alt.Chart(g_data, title=title)
+        alt.Chart(
+            g_data,
+            title=alt.Title(
+                text=title,
+                subtitle=f"{tickers[0]} / {tickers[1]} / {tickers[2]}",
+            ),
+        )
         .mark_point()
         .encode(
             x=alt.X("vol:Q")
@@ -322,25 +326,31 @@ def get_user_input():
                 ("Sweden Govt", "SEB Hybrid G-SEK", "Sweden Eq"),
             ],
         )
+        height = st.slider(
+            "Chart Height", min_value=200, max_value=800, value=400, step=50
+        )
         r_m: pl.DataFrame = get_monthly_rets(tickers=tickers, start_dt=start_dt)
 
-    return tickers, r_m
+    return tickers, r_m, height
 
 
 def main() -> None:
     st.title("Historical Risk Return Analysis")
-    tickers, r_m = get_user_input()
+    tickers, r_m, height = get_user_input()
 
     with st.spinner("Calculating Portfolio Metrics..."):
         # Risk Return Charts
         portfolios = calc_portfolio_metrics(r_m, tickers)
-        fig_pf = chart_risk_return(portfolios, tickers)
+        title = f"Realized Return & Volatility ({r_m['date'].min():%b%Y} - {r_m['date'].max():%b%Y})"
+        fig_pf = chart_risk_return(portfolios, tickers, title=title).properties(
+            height=height
+        )
         st.altair_chart(fig_pf, use_container_width=True)
 
         # Cumulative Returns Charts
         fig_rets = chart_portf_cumul_rets(
             r_m, weights={tickers[0]: 0.5, tickers[1]: 0.5}
-        )
+        ).properties(height=height)
         st.altair_chart(fig_rets, use_container_width=True)
 
     df = portfolios.with_columns(pl.exclude("name").mul(100))
