@@ -87,7 +87,12 @@ def get_params(db: DataManager) -> tuple:
     show_frnt = st.toggle("Show Efficient Frontier")
 
     st.divider()
-    st.page_link("pages/Micro_Finance_Analyzer.py", label="Micro Finance Analyzer", icon="💸")
+    st.page_link(
+        "pages/Micro_Finance_Analyzer.py", label="Micro Finance Analyzer", icon="💸"
+    )
+    st.page_link(
+        "pages/Historical_Risk_Return.py", label="Historical Risk/Return", icon="🐺"
+    )
 
     with st.popover("How to Use the App"):
         st.markdown(pathlib.Path("data/usage.txt").read_text())
