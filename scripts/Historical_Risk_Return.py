@@ -151,6 +151,7 @@ def calc_portfolio_metrics(r_m: pl.DataFrame, tickers: list[str]) -> pl.DataFram
         - name (pl.String): Portfolio name in the format "w0%/w1%/w2%"
         - r (pl.Float64): Annualized return
         - vol (pl.Float64): Annualized volatility
+        - r2vol (pl.Float64): Return to volatility ratio
         - w0 (pl.Float64): Weight of the first ticker
         - w1 (pl.Float64): Weight of the second ticker
         - w2 (pl.Float64): Weight of the third ticker
@@ -165,16 +166,17 @@ def calc_portfolio_metrics(r_m: pl.DataFrame, tickers: list[str]) -> pl.DataFram
                     w2 = round(1 - w0 - w1, 2)
                     yield w0, w1, w2
 
-    def _calc_metrics(weights):
+    def _calc_metrics(r_m, weights):
         """Calculate portfolio metrics for given weights."""
         weights_dict = dict(zip(tickers, weights))
         p_name = f"{weights[0]:0.0%}/{weights[1]:0.0%}/{weights[2]:0.0%}"
         r_p = calc_portf_rets(r_m, weights=weights_dict, name=p_name)
         r_ann = calc_rets(r_p, scale=12)["r"].item(0)
         vol_ann = calc_vols(r_p, scale=12)["vol"].item(0)
-        return p_name, r_ann, vol_ann, *weights
+        r2vol = r_ann / (vol_ann + 1e-9)
+        return p_name, r_ann, vol_ann, r2vol, *weights
 
-    lst_metrics = [_calc_metrics(weights) for weights in _gen_weights()]
+    lst_metrics = [_calc_metrics(r_m, weights) for weights in _gen_weights()]
 
     portfolios = pl.DataFrame(
         lst_metrics,
@@ -182,6 +184,7 @@ def calc_portfolio_metrics(r_m: pl.DataFrame, tickers: list[str]) -> pl.DataFram
             ("name", pl.String),
             ("r", pl.Float64),
             ("vol", pl.Float64),
+            ("r2vol", pl.Float64),
             ("w0", pl.Float64),
             ("w1", pl.Float64),
             ("w2", pl.Float64),
@@ -283,7 +286,7 @@ def chart_portf_cumul_rets(
     # add zero to previous month
     df_zero = (
         r_m.group_by("security")
-        .agg((pl.col("date").min() - pl.duration(days=1)).alias("date"))
+        .agg((pl.col("date").min() - pl.duration(days=22)).alias("date"))
         .select("date", "security", pl.lit(0.0).alias("r_cum"))
     )
     g_data = pl.concat([df_zero, g_data])
@@ -311,12 +314,13 @@ def get_user_input():
     with st.sidebar:
         st.title("Parameters")
 
-        start_dt = st.date_input(
-            "Start Date",
-            min_value=date(1999, 12, 31),
-            max_value=date(2023, 3, 30),
-            value=date(2004, 9, 30),
+        start_year = st.slider(
+            "Start Year",
+            min_value=1999,
+            max_value=2023,
+            value=2004,
         )
+        start_dt = date(start_year, 1, 1)
         tickers = st.selectbox(
             "Select tickers",
             options=[
@@ -347,24 +351,44 @@ def main() -> None:
         )
         st.altair_chart(fig_pf, use_container_width=True)
 
-        # Cumulative Returns Charts
-        fig_rets = chart_portf_cumul_rets(
-            r_m, weights={tickers[0]: 0.5, tickers[1]: 0.5}
-        ).properties(height=height)
+    # Cumulative Returns Charts
+    st.markdown("## Total Returns Chart")
+    portfolios = portfolios.sort(by="r2vol", descending=True)
+    c1, c2 = st.columns([0.4, 1])
+    with c1:  # Portfolio Metrics Table
+        df = portfolios.with_columns(pl.exclude(["name", "r2vol"]).mul(100))
+        portf = st.dataframe(
+            df,
+            use_container_width=True,
+            column_config={
+                "name": st.column_config.TextColumn("Portfolio"),
+                "r": st.column_config.NumberColumn(
+                    "Return", help="Annualized Return", format="%0.1f %%"
+                ),
+                "vol": st.column_config.NumberColumn(
+                    "Volatility", help="Annualized Volatility", format="%0.1f %%"
+                ),
+                "r2vol": st.column_config.NumberColumn(
+                    "Ret/Vol", help="Volatility Adjusted Return", format="%0.2f"
+                ),
+                "w0": st.column_config.NumberColumn(tickers[0], format="%0.0f %%"),
+                "w1": st.column_config.NumberColumn(tickers[1], format="%0.0f %%"),
+                "w2": st.column_config.NumberColumn(tickers[2], format="%0.0f %%"),
+            },
+            selection_mode="single-row",
+            on_select="rerun",
+        )
+        st.session_state["sel_row"] = portf.selection.rows
+    with c2:
+        weights = {tickers[0]: 0.5, tickers[1]: 0.5}  # default values
+        if "sel_row" not in st.session_state:
+            st.session_state["sel_row"] = [0]
+        if len(st.session_state["sel_row"]) > 0:
+            row = portfolios.row(st.session_state["sel_row"][0], named=True)
+            weights = {tickers[i]: row[f"w{i}"] for i in range(3)}
+    
+        fig_rets = chart_portf_cumul_rets(r_m, weights).properties(height=height)
         st.altair_chart(fig_rets, use_container_width=True)
-
-    df = portfolios.with_columns(pl.exclude("name").mul(100))
-    st.dataframe(
-        df,
-        column_config={
-            "r": st.column_config.NumberColumn("Return [%]", format="%0.1f %%"),
-            "vol": st.column_config.NumberColumn("Volatility [%]", format="%0.1f %%"),
-            "w0": st.column_config.NumberColumn(tickers[0], format="%0.0f %%"),
-            "w1": st.column_config.NumberColumn(tickers[1], format="%0.0f %%"),
-            "w2": st.column_config.NumberColumn(tickers[2], format="%0.0f %%"),
-        },
-    )
-
     st.divider()
     st.caption(Path("data/disclaimer.txt").read_text())
 

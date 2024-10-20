@@ -216,3 +216,42 @@ def test_calc_portf_rets():
         }
     )
     assert_frame_equal(rets, exp_rets)
+
+
+def test_calc_portfolio_metrics():
+    """Unit test on calc_portfolio_metrics function"""
+    tickers = ["SEB Hybrid G-SEK", "Sweden Eq", "Sweden Govt"]
+    r_m = (
+        rr.get_monthly_rets(tickers=tickers, start_dt=date(2023, 3, 29))
+        .filter(pl.col("date") < date(2024, 10, 1))
+        .with_columns(pl.col("r").round(4))
+    )
+    portfolios = rr.calc_portfolio_metrics(r_m, tickers)
+
+    # Check if the result is a DataFrame
+    assert isinstance(portfolios, pl.DataFrame)
+
+    # Check if the result has the expected columns
+    expected_columns = ["name", "r", "vol", "r2vol", "w0", "w1", "w2"]
+    assert all(col in portfolios.columns for col in expected_columns)
+
+    # Check if the result has the correct data types
+    assert portfolios["name"].dtype == pl.String
+    assert portfolios["r"].dtype == pl.Float64
+    assert portfolios["vol"].dtype == pl.Float64
+    assert portfolios["r2vol"].dtype == pl.Float64
+    assert portfolios["w0"].dtype == pl.Float64
+    assert portfolios["w1"].dtype == pl.Float64
+    assert portfolios["w2"].dtype == pl.Float64
+
+    # Check if the result has the correct number of rows
+    assert portfolios.shape == (66, 7)
+
+    # Check if the result has the correct values for a specific portfolio
+    specific_portfolio = portfolios.filter(pl.col("name") == "50%/30%/20%")
+    assert specific_portfolio["r"].item() == pytest.approx(0.1226)
+    assert specific_portfolio["vol"].item() == pytest.approx(0.0611)
+    assert specific_portfolio["r2vol"].item() == pytest.approx(2.0054)
+    assert specific_portfolio["w0"].item() == pytest.approx(0.5)
+    assert specific_portfolio["w1"].item() == pytest.approx(0.3)
+    assert specific_portfolio["w2"].item() == pytest.approx(0.2)
