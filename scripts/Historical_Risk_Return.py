@@ -326,7 +326,9 @@ def get_user_input():
             options=[
                 ("EU Govt 3-5y", "EU HY", "EU IG"),
                 ("US Trsy 3-5y", "US HY", "US IG"),
-                ("EU Govt 3-5y", "CoCo H-EUR", "EU IG"),
+                ("US Trsy 3-5y", "US HY", "S&P 500"),
+                ("EU Govt 3-5y", "EU HY", "EuroStoxx 50"),
+                ("EU Govt 3-5y", "CoCo H-EUR", "EU HY"),
                 ("Sweden Govt", "SEB Hybrid G-SEK", "Sweden Eq"),
             ],
         )
@@ -386,7 +388,7 @@ def main() -> None:
         if len(st.session_state["sel_row"]) > 0:
             row = portfolios.row(st.session_state["sel_row"][0], named=True)
             weights = {tickers[i]: row[f"w{i}"] for i in range(3)}
-    
+
         fig_rets = chart_portf_cumul_rets(r_m, weights).properties(height=height)
         st.altair_chart(fig_rets, use_container_width=True)
     st.divider()
