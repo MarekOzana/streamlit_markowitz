@@ -30,7 +30,7 @@ def ruff(session):
     session.install("black", "ruff")
 
     # Run ruff linter
-    session.run("ruff", "check", "src", "pages", "app.py")
+    session.run("ruff", "check", "src", "scripts", "app.py")
     # Run black linter
-    session.run("black", "--check", "src", "pages", "app.py")
+    session.run("black", "--check", "src", "scripts", "app.py")
 

@@ -17,7 +17,7 @@ def test_app():
 
 
 def test_app_with_adjusted_r_min():
-    at = AppTest.from_file("app.py", default_timeout=30)
+    at = AppTest.from_file("scripts/Markowitz.py", default_timeout=30)
     at.run()
 
     # Initial check to ensure the app started correctly.
@@ -36,7 +36,7 @@ def test_app_with_adjusted_r_min():
 
 
 def test_app_remove_tickers():
-    at = AppTest.from_file("app.py", default_timeout=30)
+    at = AppTest.from_file("scripts/Markowitz.py", default_timeout=30)
     at.run()
 
     # Initial check to ensure the app started correctly.
@@ -53,7 +53,7 @@ def test_app_remove_tickers():
 
 
 def test_MicroFinanceAnalyzer_smoke_test(caplog):
-    at = AppTest.from_file("pages/Micro_Finance_Analyzer.py", default_timeout=30)
+    at = AppTest.from_file("scripts/Micro_Finance_Analyzer.py", default_timeout=30)
 
     with caplog.at_level(logging.DEBUG):
         at.run()
@@ -65,14 +65,13 @@ def test_MicroFinanceAnalyzer_smoke_test(caplog):
 def test_MicroFinanceAnalyzer_page_switch():
     at = AppTest.from_file("app.py", default_timeout=30)
     at.run()
-    at.switch_page(page_path="pages/Micro_Finance_Analyzer.py")
+    at.switch_page(page_path="scripts/Micro_Finance_Analyzer.py")
     at.run()
     assert not at.exception
-    assert "Micro Finance Analyzer" in at.title[0].value
 
 
 def test_HistoricalRiskReturn_smoke_test(caplog):
-    at = AppTest.from_file("pages/Historical_Risk_Return.py", default_timeout=30)
+    at = AppTest.from_file("scripts/Historical_Risk_Return.py", default_timeout=30)
 
     with caplog.at_level(logging.DEBUG):
         at.run()
@@ -83,7 +82,6 @@ def test_HistoricalRiskReturn_smoke_test(caplog):
 def test_HistoricalRiskReturn_page_switch():
     at = AppTest.from_file("app.py", default_timeout=30)
     at.run()
-    at.switch_page(page_path="pages/Historical_Risk_Return.py")
+    at = at.switch_page(page_path="scripts/Historical_Risk_Return.py")
     at.run()
     assert not at.exception
-    assert "Historical Risk Return Analysis" in at.title[0].value

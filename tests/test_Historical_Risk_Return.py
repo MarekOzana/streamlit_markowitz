@@ -4,7 +4,7 @@ Unit tests on HIstorical_Risk_Returns streamlit module
 """
 
 from datetime import date
-import pages.Historical_Risk_Return as rr
+import scripts.Historical_Risk_Return as rr
 import polars as pl
 from polars.testing import assert_frame_equal
 import pytest

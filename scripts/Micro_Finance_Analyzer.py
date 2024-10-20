@@ -19,7 +19,6 @@ import altair as alt
 st.set_page_config(
     page_title="SEB Micro Finance Analyser",
     layout="wide",
-    page_icon="💸",
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -215,7 +214,7 @@ def main() -> None:
 
 
 # Entry point for the script
-if __name__ == "__main__":
+if __name__ == "__main__" or __name__ == "__page__":
     logging.basicConfig(level=logging.INFO)
     logger.setLevel(logging.INFO)
     main()

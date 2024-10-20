@@ -6,6 +6,7 @@ Historical RIsk Return Analysis
 import logging
 import math
 from datetime import date
+from pathlib import Path
 
 import altair as alt
 import polars as pl
@@ -14,7 +15,6 @@ import streamlit as st
 st.set_page_config(
     page_title="Historical Risk Return Analysis",
     layout="wide",
-    page_icon=":wolf:",
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -365,9 +365,12 @@ def main() -> None:
         },
     )
 
+    st.divider()
+    st.caption(Path("data/disclaimer.txt").read_text())
+
 
 # Entry point for the script
-if __name__ == "__main__":
+if __name__ == "__main__" or __name__ == "__page__":
     logging.basicConfig(level=logging.INFO)
     logger.setLevel(logging.INFO)
     main()
