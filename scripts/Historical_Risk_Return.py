@@ -330,7 +330,7 @@ def get_user_input():
                 ("EU Govt 3-5y", "EU HY", "EuroStoxx 50"),
                 ("EU Govt 3-5y", "CoCo H-EUR", "EU HY"),
                 ("Sweden Govt", "SEB Hybrid G-SEK", "Sweden Eq"),
-                ("EU Govt 3-5y", "SEB Hybrid R-EUR", "EuroStoxx 50")
+                ("EU Govt 3-5y", "SEB Hybrid R-EUR", "EuroStoxx 50"),
             ],
         )
         height = st.slider(
