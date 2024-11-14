@@ -52,20 +52,20 @@ def get_params(db: DataManager) -> tuple:
     """
     # get r_min
     r_minimum, r_maximum = db.get_min_max_ret()
-    with st.container(border=True):
-        st.subheader("Try to change required return")
-        r_min = (
-            st.slider(
-                label="Required Return",
-                min_value=2.0,
-                max_value=8.0,
-                value=6.0,
-                step=0.1,
-                format="%.1f%%",
-                help="Constraint on required minimum return",
-            )
-            / 100
+
+    r_min = (
+        st.slider(
+            label="Required Return",
+            min_value=2.0,
+            max_value=8.0,
+            value=6.0,
+            step=0.1,
+            format="%.1f%%",
+            help="Constraint on required minimum return",
         )
+        / 100
+    )
+
     # get tickers
     tickers = st.multiselect(
         label="Tickers",
