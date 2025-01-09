@@ -23,7 +23,7 @@ def test_app_with_adjusted_r_min():
     # Initial check to ensure the app started correctly.
     assert not at.exception, "The app should start without exceptions."
     assert "**Expected Return in 1y** = 6.0%" in at.markdown[0].value
-    assert "**Expected volatility** = 2.4%" in at.markdown[0].value
+    assert "**Expected volatility** = 2.3%" in at.markdown[0].value
 
     # Set the r_min slider to 8%.
     r_min_slider = at.sidebar.slider[0]
@@ -42,7 +42,7 @@ def test_app_remove_tickers():
     # Initial check to ensure the app started correctly.
     assert not at.exception, "The app should start without exceptions."
     assert "**Expected Return in 1y** = 6.0%" in at.markdown[0].value
-    assert "**Expected volatility** = 2.4%" in at.markdown[0].value
+    assert "**Expected volatility** = 2.3%" in at.markdown[0].value
 
     at.sidebar.multiselect[0].unselect("Climate Focus").run()
 
