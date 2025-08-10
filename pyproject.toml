@@ -1,0 +1,23 @@
+[project]
+name = "streamlit-markowitz"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "altair>=5.5.0",
+    "curl-cffi>=0.13.0",
+    "filelock>=3.18.0",
+    "numpy>=2.3.2",
+    "pandas>=2.3.1",
+    "polars>=1.32.2",
+    "scipy>=1.16.1",
+    "streamlit>=1.48.0",
+    "yfinance>=0.2.65",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+]

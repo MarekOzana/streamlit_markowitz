@@ -18,7 +18,7 @@ def r_m():
         rr.get_monthly_rets(tickers=tickers, start_dt=start_dt)
         .filter(pl.col("date") < date(2024, 10, 1))
         .with_columns(pl.col("r").round(4))
-    )
+    ).sort(by=["security", "date"])
     return r_m
 
 

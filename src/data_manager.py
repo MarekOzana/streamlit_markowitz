@@ -62,31 +62,30 @@ class DataManager:
             self.t_price = pl.read_parquet(price_tbl).with_columns(self.PRICE_COLS)
         self.set_ret_vol_corr(self.names())  # initialize
 
-    def _setup_session(self) -> requests.Session:
+    def _yf_session_or_none(self):
         """
-        Initialize and configure an HTTP session for fetching data from Yahoo Finance.
-
-        This method sets up a requests session, applying a proxy configuration if the
-        YFIN_PROXY environment variable is set. If the proxy is set, it configures the
-        session to use this proxy for HTTP and HTTPS requests. Additionally, it
-        configures the session to use the appropriate SSL certification based
-        on the certifi library's default location.
-
-        Returns:
-            requests.Session: A configured requests.Session object ready for use in data
-            fetching, with or without proxy settings applied.
+        Return a curl_cffi session (for proxy cases) or None to let yfinance handle it.
+        New yfinance requires curl_cffi sessions; passing requests.Session will crash.
         """
-        session = requests.Session()
         yfin_proxy = os.getenv("YFIN_PROXY")
-        if yfin_proxy:
-            logger.debug(f"Using proxy: {yfin_proxy}")
-            session.proxies.update({"http": yfin_proxy, "https": yfin_proxy})
-            session.verify = certifi.where()
-        else:
-            logger.debug("Not using proxy")
-        return session
+        if not yfin_proxy:
+            logger.debug("Not using proxy; letting yfinance manage its session.")
+            return None
+        try:
+            from curl_cffi import requests as cf_requests
+            s = cf_requests.Session(impersonate="chrome")
+            s.proxies.update({"http": yfin_proxy, "https": yfin_proxy})
+            s.verify = certifi.where()
+            logger.debug(f"Using proxy via curl_cffi: {yfin_proxy}")
+            return s
+        except Exception as e:
+            logger.warning(
+                "Proxy requested but curl_cffi unavailable or failed (%s). Proceeding without explicit session; "
+                "set standard HTTP(S)_PROXY env vars as fallback.", e
+            )
+            return None
 
-    def _download_data(self, session: requests.Session, f_row: dict) -> pl.DataFrame:
+    def _download_data(self, f_row: dict) -> pl.DataFrame:
         """
         Download historical stock data from Yahoo Finance for a specific fund.
 
@@ -113,7 +112,7 @@ class DataManager:
             If the historical data for the specified fund is empty
         """
         logger.info(f"Updating {f_row['name']} from {f_row['start_date']}")
-        yf_ticker = yf.Ticker(ticker=f_row["yahoo"], session=session)
+        yf_ticker = yf.Ticker(ticker=f_row["yahoo"], session=self._yf_session_or_none())
         ts = yf_ticker.history(start=f_row["start_date"], interval="1d")
         if len(ts) == 0:
             logger.debug(f"No data for {f_row['name']}")
@@ -125,8 +124,6 @@ class DataManager:
 
     def update_from_yahoo(self, callback=None) -> None:
         """Update time series for all tickers from yahoo finance"""
-        session = self._setup_session()
-
         tbl = self.last_update().with_columns(
             (
                 pl.col("max_date").fill_null(date(2022, 12, 31)) + pl.duration(days=1)
@@ -134,7 +131,7 @@ class DataManager:
         )
         is_updated: bool = False
         for i, f_row in enumerate(tbl.rows(named=True)):
-            new_prices = self._download_data(session, f_row)
+            new_prices = self._download_data(f_row)
             if new_prices is not None:
                 self.t_price = pl.concat([self.t_price, new_prices])
                 is_updated = True
@@ -616,9 +613,8 @@ def generate_synthetic_MicroFin_series():
     # Get currency
     logger.debug("Downloading USDSEK series from Yahoo")
     dm = DataManager()
-    session = dm._setup_session()
     pd_usd = (
-        yf.Ticker(ticker="SEK=X", session=session)
+        yf.Ticker(ticker="SEK=X", session=dm._yf_session_or_none())
         .history(start=rets["date"][0], interval="1d")
         .reset_index()
     )

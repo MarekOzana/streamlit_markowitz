@@ -1,11 +1,12 @@
 """
-Unit tests on data_manager module
+Updated unit tests on data_manager module after yfinance session refactor.
 
 .. author:: Marek Ozana
-.. date:: 2024-03
+.. date:: 2025-08
 """
 
-import requests
+import sys
+import types
 import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -68,23 +69,37 @@ def test__init__(dm: DataManager):
     ]
 
 
-def test_setup_session_with_proxy(dm: DataManager):
-    with patch.dict("os.environ", {"YFIN_PROXY": "http://proxyserver:port"}):
-        session = dm._setup_session()
-        assert isinstance(session, requests.sessions.Session)
-        assert session.proxies["http"] == "http://proxyserver:port"
-        assert session.proxies["https"] == "http://proxyserver:port"
+def test_yf_session_with_proxy(dm: DataManager, monkeypatch):
+    """_yf_session_or_none returns a curl_cffi-like session and applies proxies."""
+
+    # Dummy curl_cffi.requests.Session to avoid real dependency
+    class DummySession:
+        def __init__(self, impersonate=None):
+            self.proxies = {}
+            self.verify = None
+
+    dummy_requests = types.SimpleNamespace(Session=DummySession)
+    dummy_module = types.SimpleNamespace(requests=dummy_requests)
+
+    monkeypatch.setenv("YFIN_PROXY", "http://proxyserver:port")
+    # Inject dummy curl_cffi into sys.modules
+    monkeypatch.setitem(sys.modules, "curl_cffi", dummy_module)
+    monkeypatch.setitem(sys.modules, "curl_cffi.requests", dummy_requests)
+
+    s = dm._yf_session_or_none()
+    assert isinstance(s, DummySession)
+    assert s.proxies["http"] == "http://proxyserver:port"
+    assert s.proxies["https"] == "http://proxyserver:port"
+    assert s.verify  # certifi path set
 
 
-def test_setup_session_without_proxy(dm: DataManager):
-    with patch.dict("os.environ", {}, clear=True):
-        session = dm._setup_session()
-        assert isinstance(session, requests.sessions.Session)
-        assert not session.proxies
+def test_yf_session_without_proxy(dm: DataManager, monkeypatch):
+    monkeypatch.delenv("YFIN_PROXY", raising=False)
+    session = dm._yf_session_or_none()
+    assert session is None
 
 
 def test_download_data(dm: DataManager, caplog: pytest.LogCaptureFixture):
-    session = requests.Session()
     f_row = {
         "name": "SEB Hybrid",
         "start_date": "2024-03-18",
@@ -107,7 +122,7 @@ def test_download_data(dm: DataManager, caplog: pytest.LogCaptureFixture):
     # Patch yfinance.Ticker.history to return the mock DataFrame
     with patch("yfinance.Ticker.history", return_value=mock_ts):
         with caplog.at_level("DEBUG"):
-            result = dm._download_data(session, f_row)
+            result = dm._download_data(f_row)
 
     # Verify the returned DataFrame
     assert isinstance(result, pl.DataFrame)
@@ -119,7 +134,6 @@ def test_download_data(dm: DataManager, caplog: pytest.LogCaptureFixture):
 
 
 def test_download_data_empty_series(dm: DataManager, caplog: pytest.LogCaptureFixture):
-    session = requests.Session()
     f_row = {
         "name": "SEB Hybrid",
         "start_date": "2024-03-18",
@@ -133,7 +147,7 @@ def test_download_data_empty_series(dm: DataManager, caplog: pytest.LogCaptureFi
     # Patch yfinance.Ticker.history to return the empty mock DataFrame
     with patch("yfinance.Ticker.history", return_value=mock_ts):
         with caplog.at_level("DEBUG"):
-            result = dm._download_data(session, f_row)
+            result = dm._download_data(f_row)
 
     # Verify that the result is None since there's no data
     assert result is None
@@ -143,29 +157,26 @@ def test_download_data_empty_series(dm: DataManager, caplog: pytest.LogCaptureFi
 
 
 def test_update_from_yahoo(dm: DataManager, caplog: pytest.LogCaptureFixture):
-    # Mock _setup_session and _download_data to isolate update_from_yahoo testing
-    with patch.object(dm, "_setup_session") as m_setup:
-        with patch.object(dm, "_download_data") as m_download:
-            with patch.object(pl.DataFrame, "write_parquet") as m_write:
-                m_setup.return_value = MagicMock()
-                m_download.return_value = pl.DataFrame(
-                    {
-                        "fund_id": [1],
-                        "date": [datetime.date(2023, 3, 15)],
-                        "price": [115.0],
-                    }
-                ).with_columns(DataManager.PRICE_COLS)
-                # Use a MagicMock for the callback to check calls
-                m_callback = MagicMock()
-                with caplog.at_level(level="DEBUG"):
-                    dm.update_from_yahoo(callback=m_callback)
-                # Assertions will depend on what you want to check, for example:
-                m_setup.assert_called_once()
-                m_download.assert_called()
-                m_write.assert_called_once_with(dm.price_tbl)
-                assert r"Saving data to tests" in caplog.text
-                assert m_callback.call_count == 7
-                m_callback.assert_any_call(1.0 / 7.0)
+    # Mock _download_data to isolate update_from_yahoo testing
+    with patch.object(dm, "_download_data") as m_download:
+        with patch.object(pl.DataFrame, "write_parquet") as m_write:
+            m_download.return_value = pl.DataFrame(
+                {
+                    "fund_id": [1],
+                    "date": [datetime.date(2023, 3, 15)],
+                    "price": [115.0],
+                }
+            ).with_columns(DataManager.PRICE_COLS)
+            # Use a MagicMock for the callback to check calls
+            m_callback = MagicMock()
+            with caplog.at_level(level="DEBUG"):
+                dm.update_from_yahoo(callback=m_callback)
+            # Assertions:
+            m_download.assert_called()
+            m_write.assert_called_once_with(dm.price_tbl)
+            assert r"Saving data to tests" in caplog.text
+            assert m_callback.call_count == 7
+            m_callback.assert_any_call(1.0 / 7.0)
 
 
 def test_set_ret_vol_corr(dm: DataManager):
@@ -353,16 +364,6 @@ class TestUpdater:
         assert df.with_columns(cs.by_dtype(pl.Float64).round(2)).to_dict(
             as_series=False
         ) == {
-            "date": [
-                datetime.date(2024, 3, 27),
-                datetime.date(2024, 3, 27),
-                datetime.date(2024, 3, 27),
-                datetime.date(2024, 3, 27),
-                datetime.date(2024, 3, 27),
-                datetime.date(2024, 3, 27),
-                datetime.date(2024, 3, 27),
-                datetime.date(2024, 3, 27),
-            ],
             "portf": [
                 "HYBRID",
                 "HYBRID",
@@ -386,6 +387,16 @@ class TestUpdater:
                 "Cash",
             ],
             "mv_pct": [0.03, 0.02, 0.01, 0.04, 0.01, 0.0, 0.01, 0.03],
+            "date": [
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+                datetime.date(2024, 3, 27),
+            ],
         }
 
     def test_save_t_keyfigures_table(
